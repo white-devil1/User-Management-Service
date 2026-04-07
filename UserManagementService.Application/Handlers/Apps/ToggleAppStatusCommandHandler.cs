@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using UserManagementService.Application.Commands.Apps;
 using UserManagementService.Application.DTOs.Apps;
 using UserManagementService.Application.Events;
@@ -19,17 +19,35 @@ public class ToggleAppStatusCommandHandler
     public async Task<AppDto> Handle(
         ToggleAppStatusCommand request, CancellationToken cancellationToken)
     {
-        var result = await _appService.ToggleAppStatusAsync(
-            request.Id, request.IsActive, request.UpdatedBy, cancellationToken);
-
-        _logPublisher.PublishActivity(new ActivityLogEvent
+        try
         {
-            ActionType = 21,  // AppUpdated (status toggle)
-            EntityType = 2,   // App
-            EntityId = result.Id.ToString(),
-            Description = $"App '{result.Name}' was {(request.IsActive ? "activated" : "deactivated")}",
-            UserId = request.UpdatedBy
-        });
-        return result;
+            var result = await _appService.ToggleAppStatusAsync(
+                request.Id, request.IsActive, request.UpdatedBy, cancellationToken);
+
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 21,  // AppUpdated (status toggle)
+                EntityType = 2,   // App
+                EntityId = result.Id.ToString(),
+                Description = $"App '{result.Name}' was {(request.IsActive ? "activated" : "deactivated")}",
+                UserId = request.UpdatedBy,
+                IsSuccess = true
+            });
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 21,  // AppUpdated (status toggle)
+                EntityType = 2,   // App
+                EntityId = request.Id.ToString(),
+                Description = "App status toggle failed",
+                UserId = request.UpdatedBy,
+                IsSuccess = false,
+                FailureReason = ex.Message
+            });
+            throw;
+        }
     }
 }

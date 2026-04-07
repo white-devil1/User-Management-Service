@@ -19,26 +19,44 @@ public class UpdateAppCommandHandler
     public async Task<AppDto> Handle(
         UpdateAppCommand request, CancellationToken cancellationToken)
     {
-        var result = await _appService.UpdateAppAsync(
-            request.Id,
-            new UpdateAppRequest
-            {
-                Name = request.Name,
-                Description = request.Description,
-                Icon = request.Icon,
-                DisplayOrder = request.DisplayOrder,
-                IsActive = request.IsActive
-            },
-            request.UpdatedBy, cancellationToken);
-
-        _logPublisher.PublishActivity(new ActivityLogEvent
+        try
         {
-            ActionType = 21,  // AppUpdated
-            EntityType = 2,   // App
-            EntityId = result.Id.ToString(),
-            Description = $"App '{result.Name}' was updated",
-            UserId = request.UpdatedBy
-        });
-        return result;
+            var result = await _appService.UpdateAppAsync(
+                request.Id,
+                new UpdateAppRequest
+                {
+                    Name = request.Name,
+                    Description = request.Description,
+                    Icon = request.Icon,
+                    DisplayOrder = request.DisplayOrder,
+                    IsActive = request.IsActive
+                },
+                request.UpdatedBy, cancellationToken);
+
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 21,  // AppUpdated
+                EntityType = 2,   // App
+                EntityId = result.Id.ToString(),
+                Description = $"App '{result.Name}' was updated",
+                UserId = request.UpdatedBy,
+                IsSuccess = true
+            });
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 21,  // AppUpdated
+                EntityType = 2,   // App
+                EntityId = request.Id.ToString(),
+                Description = "App update failed",
+                UserId = request.UpdatedBy,
+                IsSuccess = false,
+                FailureReason = ex.Message
+            });
+            throw;
+        }
     }
 }
