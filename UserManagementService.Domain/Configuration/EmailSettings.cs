@@ -31,5 +31,5 @@ public class OtpSettings
 {
     public int CodeLength { get; set; } = 6;
     public int ExpirationMinutes { get; set; } = 10;
-    public int MaxAttemptsPerHour { get; set; } = 3;
+    public int MaxAttemptsPerHour { get; set; } = 10;
 }
