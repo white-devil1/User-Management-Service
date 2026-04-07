@@ -78,7 +78,7 @@ public class AuthController : ControllerBase
             UserAgent = userAgent
         });
         return Ok(ApiResponse<object>.Ok(
-            null, "If the email exists, an OTP has been sent."));
+            null, "OTP has been sent to your email."));
     }
 
     [HttpPost("verify-otp")]

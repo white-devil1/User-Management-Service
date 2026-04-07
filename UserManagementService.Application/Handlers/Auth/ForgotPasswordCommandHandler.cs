@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using UserManagementService.Application.Commands.Auth;
+using UserManagementService.Application.Common.Exceptions;
 using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;
 using UserManagementService.Domain.Entities.Identity;
@@ -36,14 +37,11 @@ public class ForgotPasswordCommandHandler
 
         var user = await _userManager.FindByEmailAsync(request.Email);
 
-        // Silently return true — do NOT log missing/inactive users
-        // This prevents email enumeration attacks
-        if (user == null || !user.IsActive || user.IsDeleted)
-        {
-            _logger.LogWarning(
-                "Forgot password: user not eligible — {Email}", request.Email);
-            return true;
-        }
+        if (user == null)
+            throw new NotFoundException("User", request.Email);
+
+        if (user.IsDeleted || !user.IsActive)
+            throw new BadRequestException("This account is inactive or has been deleted.");
 
         try
         {
