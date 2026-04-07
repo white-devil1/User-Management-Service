@@ -1,5 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using UserManagementService.Application.Common.Exceptions;
+using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;
 using UserManagementService.Domain.Configuration;
 using UserManagementService.Domain.Entities.Auth;
@@ -12,15 +15,21 @@ public class OtpService : IOtpService
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly EmailSettings _emailSettings;
+    private readonly ILogPublisher _logPublisher;
+    private readonly ILogger<OtpService> _logger;
 
     public OtpService(
         ApplicationDbContext context,
         IEmailService emailService,
-        IOptions<EmailSettings> emailSettings)
+        IOptions<EmailSettings> emailSettings,
+        ILogPublisher logPublisher,
+        ILogger<OtpService> logger)
     {
         _context = context;
         _emailService = emailService;
         _emailSettings = emailSettings.Value;
+        _logPublisher = logPublisher;
+        _logger = logger;
     }
 
     public async Task<string> GenerateAndSendOtpAsync(
@@ -35,7 +44,24 @@ public class OtpService : IOtpService
         var attempts = await GetOtpAttemptsLastHourAsync(email, cancellationToken);
         if (attempts >= _emailSettings.OtpSettings.MaxAttemptsPerHour)
         {
-            throw new InvalidOperationException($"Maximum OTP attempts ({_emailSettings.OtpSettings.MaxAttemptsPerHour}) exceeded. Please try again later.");
+            var message = $"Maximum OTP attempts ({_emailSettings.OtpSettings.MaxAttemptsPerHour}) exceeded. Please try again in 1 hour.";
+
+            _logger.LogWarning("OTP rate limit exceeded for email: {Email}. Attempts in last hour: {Attempts}", email, attempts);
+
+            _logPublisher.PublishError(new ErrorLogEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                Severity = 2,           // Warning
+                Source = 0,             // Backend
+                Category = 1,           // ValidationError
+                ServiceName = "UserManagementService",
+                Message = message,
+                RequestPath = "/api/auth/forgot-password",
+                RequestMethod = "POST",
+                StatusCode = 400
+            });
+
+            throw new BadRequestException(message);
         }
 
         // ✅ Generate 6-digit OTP
