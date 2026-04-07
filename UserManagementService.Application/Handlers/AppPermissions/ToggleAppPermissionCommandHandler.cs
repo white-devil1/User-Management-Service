@@ -19,17 +19,50 @@ public class ToggleAppPermissionCommandHandler
     public async Task<AppPermissionDto> Handle(
         ToggleAppPermissionCommand request, CancellationToken cancellationToken)
     {
-        var result = await _permissionService.TogglePermissionAsync(
-            request.Id, request.IsEnabled, request.UpdatedBy, cancellationToken);
-
-        _logPublisher.PublishActivity(new ActivityLogEvent
+try
         {
-            ActionType = 43,  // PermissionToggled
-            EntityType = 5,   // Permission
-            EntityId = request.Id.ToString(),
-            Description = $"Permission '{result.PermissionCode}' was {(request.IsEnabled ? "enabled" : "disabled")}",
-            UserId = request.UpdatedBy
-        });
-        return result;
+        
+                var result = await _permissionService.TogglePermissionAsync(
+                    request.Id, request.IsEnabled, request.UpdatedBy, cancellationToken);
+        
+                _logPublisher.PublishActivity(new ActivityLogEvent
+                {
+                    ActionType = 43,  // PermissionToggled
+                    EntityType = 5,   // Permission
+                    EntityId = request.Id.ToString(),
+                    Description = $"Permission '{result.PermissionCode}' was {(request.IsEnabled ? "enabled" : "disabled")}",
+                    UserId = request.UpdatedBy
+                });
+                return result;
+        }
+        catch (NotFoundException)
+        {
+            throw;
+        }
+        catch (ValidationException)
+        {
+            throw;
+        }
+        catch (ConflictException)
+        {
+            throw;
+        }
+        catch (UnauthorizedException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 0,  // AppPermissionToggled
+                EntityType = 8,
+                Description = $"Unexpected error in AppPermissionToggled",
+                UserId = request.UpdatedBy,
+                IsSuccess = false,
+                FailureReason = ex.Message
+            });
+            throw;
+        }
     }
 }

@@ -35,13 +35,13 @@ public class GlobalExceptionHandlingMiddleware
                 context.Request.Method, context.Request.Path);
 
             // Fire and forget — never blocks the response
-            PublishErrorLog(context, ex);
+            await PublishErrorLogAsync(context, ex);
 
             await HandleExceptionAsync(context, ex);
         }
     }
 
-    private void PublishErrorLog(HttpContext context, Exception ex)
+    private async Task PublishErrorLogAsync(HttpContext context, Exception ex)
     {
         try
         {
@@ -57,18 +57,28 @@ public class GlobalExceptionHandlingMiddleware
                 context.User.FindFirst("BranchId")?.Value,
                 out var branchId);
 
+            // Determine status code based on exception type
+            var statusCode = ex switch
+            {
+                NotFoundException => 404,
+                ConflictException => 409,
+                AppValidationException or BadRequestException => 400,
+                UnauthorizedException or ForbiddenException or UnauthorizedAccessException => 403,
+                _ => 500
+            };
+
             publisher.PublishError(new ErrorLogEvent
             {
                 Timestamp = DateTime.UtcNow,
-                Severity = 3,   // Error
+                Severity = statusCode >= 500 ? 3 : 2,   // Error for 5xx, Warning for others
                 Source = 0,   // Backend
-                Category = 0,   // ServerError
+                Category = GetErrorCategory(ex),
                 ServiceName = "UserManagementService",
                 Message = ex.Message,
                 StackTrace = ex.StackTrace,
                 RequestPath = context.Request.Path,
                 RequestMethod = context.Request.Method,
-                StatusCode = 500,
+                StatusCode = statusCode,
                 UserId = userId,
                 TenantId = tenantId == Guid.Empty ? null : tenantId,
                 BranchId = branchId == Guid.Empty ? null : branchId,
@@ -77,6 +87,18 @@ public class GlobalExceptionHandlingMiddleware
             });
         }
         catch { /* silent — never affect response */ }
+    }
+
+    private static int GetErrorCategory(Exception ex)
+    {
+        return ex switch
+        {
+            ValidationException or BadRequestException => 1,  // ValidationError
+            NotFoundException => 2,  // NotFoundError
+            ConflictException => 3,  // ConflictError
+            UnauthorizedException or ForbiddenException or UnauthorizedAccessException => 4,  // AuthorizationError
+            _ => 0  // ServerError
+        };
     }
 
     private static async Task HandleExceptionAsync(
@@ -90,8 +112,12 @@ public class GlobalExceptionHandlingMiddleware
                 (HttpStatusCode.Conflict, e.Message, new List<string>()),
             AppValidationException e =>
                 (HttpStatusCode.BadRequest, "Validation failed", e.Errors),
-            UnauthorizedException e =>
+            BadRequestException e =>
+                (HttpStatusCode.BadRequest, e.Message, e.Errors),
+            ForbiddenException e =>
                 (HttpStatusCode.Forbidden, e.Message, new List<string>()),
+            UnauthorizedException e =>
+                (HttpStatusCode.Unauthorized, e.Message, new List<string>()),
             UnauthorizedAccessException e =>
                 (HttpStatusCode.Forbidden, e.Message, new List<string>()),
             _ =>

@@ -37,32 +37,36 @@ public class LoginCommandHandler
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
 
-        // Wrong password or user not found — publish AuthFailure error then throw
+        // Wrong password or user not found — publish LoginAudit failure then throw
         if (user == null ||
             !await _userManager.CheckPasswordAsync(user, request.Password))
         {
-            _logPublisher.PublishError(new ErrorLogEvent
+            _logPublisher.PublishLoginAudit(new LoginAuditEvent
             {
-                Severity = 2,  // Warning
-                Category = 1,  // AuthFailure
-                Message = $"Login failed: invalid credentials for {request.Email}",
-                UserEmail = request.Email
+                EventType = 0,  // Login
+                Email = request.Email,
+                IsSuccess = false,
+                FailureReason = "Invalid credentials",
+                IpAddress = request.IpAddress,
+                UserAgent = request.UserAgent
             });
-            throw new ValidationException("Invalid email or password.");
+            throw new UnauthorizedException("Invalid email or password.");
         }
 
         // Deleted account
         if (user.IsDeleted)
         {
-            _logPublisher.PublishError(new ErrorLogEvent
+            _logPublisher.PublishLoginAudit(new LoginAuditEvent
             {
-                Severity = 2,
-                Category = 1,
-                Message = $"Login failed: account deleted — {request.Email}",
-                UserEmail = request.Email,
+                EventType = 0,
                 UserId = user.Id,
+                Email = user.Email!,
                 TenantId = user.TenantId,
-                BranchId = user.BranchId
+                BranchId = user.BranchId,
+                IsSuccess = false,
+                FailureReason = "Account deleted",
+                IpAddress = request.IpAddress,
+                UserAgent = request.UserAgent
             });
             throw new NotFoundException("Account not found.");
         }
@@ -70,35 +74,38 @@ public class LoginCommandHandler
         // Deactivated account
         if (!user.IsActive)
         {
-            _logPublisher.PublishError(new ErrorLogEvent
+            _logPublisher.PublishLoginAudit(new LoginAuditEvent
             {
-                Severity = 2,
-                Category = 1,
-                Message = $"Login failed: account deactivated — {request.Email}",
-                UserEmail = request.Email,
+                EventType = 0,
                 UserId = user.Id,
+                Email = user.Email!,
                 TenantId = user.TenantId,
-                BranchId = user.BranchId
+                BranchId = user.BranchId,
+                IsSuccess = false,
+                FailureReason = "Account deactivated",
+                IpAddress = request.IpAddress,
+                UserAgent = request.UserAgent
             });
-            throw new ValidationException(
-                "Account is deactivated. Contact administrator.");
+            throw new ForbiddenException("Account is deactivated. Contact administrator.");
         }
 
         // Expired temporary password
         if (user.IsTemporaryPassword &&
             user.TemporaryPasswordExpiresAt < DateTime.UtcNow)
         {
-            _logPublisher.PublishError(new ErrorLogEvent
+            _logPublisher.PublishLoginAudit(new LoginAuditEvent
             {
-                Severity = 2,
-                Category = 1,
-                Message = $"Login failed: expired temporary password — {request.Email}",
-                UserEmail = request.Email,
+                EventType = 0,
                 UserId = user.Id,
+                Email = user.Email!,
                 TenantId = user.TenantId,
-                BranchId = user.BranchId
+                BranchId = user.BranchId,
+                IsSuccess = false,
+                FailureReason = "Temporary password expired",
+                IpAddress = request.IpAddress,
+                UserAgent = request.UserAgent
             });
-            throw new ValidationException("Temporary password has expired.");
+            throw new BadRequestException("Temporary password has expired.");
         }
 
         var roles = await _userManager.GetRolesAsync(user);
@@ -127,7 +134,10 @@ public class LoginCommandHandler
             UserId = user.Id,
             Email = user.Email!,
             TenantId = user.TenantId,
-            BranchId = user.BranchId
+            BranchId = user.BranchId,
+            IsSuccess = true,
+            IpAddress = request.IpAddress,
+            UserAgent = request.UserAgent
         });
 
         return new LoginResponse

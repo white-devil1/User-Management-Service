@@ -19,8 +19,10 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<ApiResponse<LoginResponse>>> Login(
         [FromBody] LoginRequest request)
     {
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = Request.Headers.UserAgent.ToString();
         var result = await _mediator.Send(
-            new LoginCommand(request.Email, request.Password));
+            new LoginCommand(request.Email, request.Password, clientIp, userAgent));
         return Ok(ApiResponse<LoginResponse>.Ok(
             result, "Login successful"));
     }

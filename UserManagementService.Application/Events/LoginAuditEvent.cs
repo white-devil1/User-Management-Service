@@ -14,4 +14,8 @@ public class LoginAuditEvent
     public string? IpAddress { get; set; }
     public string? UserAgent { get; set; }
     public int DeviceType { get; set; } = 0;
+    public bool IsSuccess { get; set; }
+    public string? FailureReason { get; set; }
+    public string? BrowserInfo { get; set; }
+    public string? OsInfo { get; set; }
 }

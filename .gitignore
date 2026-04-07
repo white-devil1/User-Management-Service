@@ -1,9 +1,44 @@
+```
+# Build artifacts and binaries
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
 bin/
 obj/
-.vs/
-*.user
-*.suo
-.idea/
-.vscode/
+out/
+
+# Dependencies
+node_modules/
+packages/
+
+# Logs and temp files
 *.log
+*.tmp
+*.swp
+
+# Environment
 .env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.userprefs
+*.user
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+*.coverage
+
+# Local config
+local.properties
+```

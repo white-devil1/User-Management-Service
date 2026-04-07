@@ -16,6 +16,9 @@ public class UpdatePageCommandHandler : IRequestHandler<UpdatePageCommand, PageD
 
     public async Task<PageDto> Handle(UpdatePageCommand request, CancellationToken cancellationToken)
     {
+try
+        {
+
         var updateRequest = new UpdatePageRequest
         {
             Name = request.Name,
@@ -25,5 +28,29 @@ public class UpdatePageCommandHandler : IRequestHandler<UpdatePageCommand, PageD
         };
 
         return await _pageService.UpdatePageAsync(request.Id, updateRequest, request.UpdatedBy, cancellationToken);
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 31,  // PageUpdated
+                EntityType = 3,
+                EntityId = request.Id?.ToString() ?? "unknown",
+                Description = "PageUpdated completed",
+                UserId = request.UpdatedBy ?? request.DeletedBy ?? request.CreatedBy,
+                IsSuccess = true
+            });
+
+        }
+        catch (Exception ex)
+        {
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 31,  // PageUpdated
+                EntityType = 3,
+                Description = $"Unexpected error in PageUpdated",
+                UserId = request.UpdatedBy ?? request.DeletedBy ?? request.CreatedBy,
+                IsSuccess = false,
+                FailureReason = ex.Message
+            });
+            throw;
+        }
     }
 }

@@ -27,4 +27,6 @@ public class ActivityLogEvent
     public Guid? BranchId { get; set; }
     public string? IpAddress { get; set; }
     public string? CorrelationId { get; set; }
+    public bool IsSuccess { get; set; } = true;
+    public string? FailureReason { get; set; }
 }
