@@ -35,7 +35,8 @@ public class CreateAppCommandHandler
             EntityType = 2,   // App
             EntityId = result.Id.ToString(),
             Description = $"App '{result.Name}' was created",
-            UserId = request.CreatedBy
+            UserId = request.CreatedBy,
+            IsSuccess = true
         });
         return result;
     }

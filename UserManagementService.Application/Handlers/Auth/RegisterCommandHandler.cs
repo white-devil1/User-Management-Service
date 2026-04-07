@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using UserManagementService.Application.Commands.Auth;
 using UserManagementService.Application.Common.Exceptions;
 using UserManagementService.Application.DTOs.Auth;
+using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;
 using UserManagementService.Domain.Entities.Identity;
 
@@ -15,17 +16,20 @@ public class RegisterCommandHandler
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenStorageService _refreshTokenStorage;
     private readonly IAppPermissionResolverService _permissionResolver;
+    private readonly ILogPublisher _logPublisher;
 
     public RegisterCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
         IRefreshTokenStorageService refreshTokenStorage,
-        IAppPermissionResolverService permissionResolver)
+        IAppPermissionResolverService permissionResolver,
+        ILogPublisher logPublisher)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _refreshTokenStorage = refreshTokenStorage;
         _permissionResolver = permissionResolver;
+        _logPublisher = logPublisher;
     }
 
     public async Task<LoginResponse> Handle(
@@ -46,8 +50,22 @@ public class RegisterCommandHandler
 
         var result = await _userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
+        {
+            // Log failed registration attempt
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 0,  // UserCreated
+                EntityType = 0,  // User
+                Description = $"User registration failed for {request.Email}",
+                UserEmail = request.Email,
+                TenantId = request.TenantId,
+                BranchId = request.BranchId,
+                IsSuccess = false,
+                FailureReason = string.Join("; ", result.Errors.Select(e => e.Description))
+            });
             throw new ValidationException(
                 result.Errors.Select(e => e.Description).ToList());
+        }
 
         var roleName = request.IsSuperAdmin ? "Super Admin" : "User";
         await _userManager.AddToRoleAsync(user, roleName);
@@ -66,6 +84,21 @@ public class RegisterCommandHandler
 
         await _refreshTokenStorage.SaveRefreshTokenAsync(
             user.Id, refreshToken, refreshExpires);
+
+        // Log successful registration
+        _logPublisher.PublishActivity(new ActivityLogEvent
+        {
+            ActionType = 0,  // UserCreated
+            EntityType = 0,  // User
+            EntityId = user.Id,
+            Description = $"User '{user.Email}' was registered successfully",
+            UserId = user.Id,
+            UserEmail = user.Email!,
+            UserRole = roleName,
+            TenantId = user.TenantId,
+            BranchId = user.BranchId,
+            IsSuccess = true
+        });
 
         return new LoginResponse
         {
