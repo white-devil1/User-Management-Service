@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using UserManagementService.Application.Commands.Roles;
+using UserManagementService.Application.Common.Exceptions;
 using UserManagementService.Application.DTOs.Roles;
 using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;
@@ -61,7 +62,7 @@ try
                 ActionType = 3,  // PermissionsAssigned
                 EntityType = 6,
                 Description = $"Unexpected error in PermissionsAssigned",
-                UserId = request.UpdatedBy,
+                UserId = request.CallerUserId,
                 IsSuccess = false,
                 FailureReason = ex.Message
             });

@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using UserManagementService.Application.Commands.AppPermissions;
+using UserManagementService.Application.Common.Exceptions;
 using UserManagementService.Application.DTOs.AppPermissions;
 using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;

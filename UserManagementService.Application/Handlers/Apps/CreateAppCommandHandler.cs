@@ -48,7 +48,7 @@ public class CreateAppCommandHandler
             {
                 ActionType = 20,  // AppCreated
                 EntityType = 2,   // App
-                EntityId = request.Id > 0 ? request.Id.ToString() : "unknown",
+                EntityId = "unknown",
                 Description = "App creation failed",
                 UserId = request.CreatedBy,
                 IsSuccess = false,

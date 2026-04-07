@@ -95,7 +95,7 @@ try
                 ActionType = 4,  // UserRestored
                 EntityType = 0,
                 Description = $"Unexpected error in UserRestored",
-                UserId = request.RestoredBy,
+                UserId = request.Id,
                 IsSuccess = false,
                 FailureReason = ex.Message
             });
