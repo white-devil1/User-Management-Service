@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using System.Text;
@@ -65,6 +66,14 @@ builder.Services.AddCors(options =>
 
 // Build the app
 var app = builder.Build();
+
+// Configure forwarded headers for proper IP address detection behind proxies
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    // In production, add known proxy IPs here
+    // KnownProxies = { IPAddress.Parse("10.0.0.1") }
+});
 
 // Use custom global exception handling middleware
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();

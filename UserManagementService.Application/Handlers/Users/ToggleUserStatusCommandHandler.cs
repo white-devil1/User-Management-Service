@@ -28,41 +28,74 @@ public class ToggleUserStatusCommandHandler
     public async Task<bool> Handle(
         ToggleUserStatusCommand request, CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByIdAsync(request.Id);
-        if (user == null || user.IsDeleted)
-            throw new NotFoundException("User", request.Id);
-
-        user.IsActive = request.IsActive;
-        user.UpdatedAt = DateTime.UtcNow;
-        user.UpdatedBy = request.UpdatedBy;
-
-        var result = await _userManager.UpdateAsync(user);
-        if (!result.Succeeded)
-            throw new ValidationException(
-                result.Errors.Select(e => e.Description).ToList());
-
-        await _eventPublisher.PublishAsync(new UserStatusChangedEvent
+try
         {
-            UserId = user.Id,
-            TenantId = user.TenantId,
-            BranchId = user.BranchId,
-            IsActive = user.IsActive,
-            UpdatedAt = user.UpdatedAt,
-            UpdatedBy = user.UpdatedBy
-        }, cancellationToken);
-
-        _logPublisher.PublishActivity(new ActivityLogEvent
+        
+                var user = await _userManager.FindByIdAsync(request.Id);
+                if (user == null || user.IsDeleted)
+                    throw new NotFoundException("User", request.Id);
+        
+                user.IsActive = request.IsActive;
+                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedBy = request.UpdatedBy;
+        
+                var result = await _userManager.UpdateAsync(user);
+                if (!result.Succeeded)
+                    throw new ValidationException(
+                        result.Errors.Select(e => e.Description).ToList());
+        
+                await _eventPublisher.PublishAsync(new UserStatusChangedEvent
+                {
+                    UserId = user.Id,
+                    TenantId = user.TenantId,
+                    BranchId = user.BranchId,
+                    IsActive = user.IsActive,
+                    UpdatedAt = user.UpdatedAt,
+                    UpdatedBy = user.UpdatedBy
+                }, cancellationToken);
+        
+                _logPublisher.PublishActivity(new ActivityLogEvent
+                {
+                    ActionType = 4,  // UserStatusChanged
+                    EntityType = 0,  // User
+                    EntityId = user.Id,
+                    Description = $"User {user.Email} was {(request.IsActive ? "activated" : "deactivated")}",
+                    UserId = request.UpdatedBy,
+                    UserEmail = user.Email,
+                    TenantId = user.TenantId,
+                    BranchId = user.BranchId
+                });
+        
+                return true;
+        }
+        catch (NotFoundException)
         {
-            ActionType = 4,  // UserStatusChanged
-            EntityType = 0,  // User
-            EntityId = user.Id,
-            Description = $"User {user.Email} was {(request.IsActive ? "activated" : "deactivated")}",
-            UserId = request.UpdatedBy,
-            UserEmail = user.Email,
-            TenantId = user.TenantId,
-            BranchId = user.BranchId
-        });
-
-        return true;
+            throw;
+        }
+        catch (ValidationException)
+        {
+            throw;
+        }
+        catch (ConflictException)
+        {
+            throw;
+        }
+        catch (UnauthorizedException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 3,  // UserStatusToggled
+                EntityType = 0,
+                Description = $"Unexpected error in UserStatusToggled",
+                UserId = request.UpdatedBy,
+                IsSuccess = false,
+                FailureReason = ex.Message
+            });
+            throw;
+        }
     }
 }

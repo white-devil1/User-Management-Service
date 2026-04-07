@@ -19,24 +19,41 @@ public class CreatePageCommandHandler
     public async Task<PageDto> Handle(
         CreatePageCommand request, CancellationToken cancellationToken)
     {
-        var result = await _pageService.CreatePageAsync(
-            new CreatePageRequest
-            {
-                AppId = request.AppId,
-                Name = request.Name,
-                Description = request.Description,
-                DisplayOrder = request.DisplayOrder
-            },
-            request.CreatedBy, cancellationToken);
-
-        _logPublisher.PublishActivity(new ActivityLogEvent
+        try
         {
-            ActionType = 30,  // PageCreated
-            EntityType = 3,   // Page
-            EntityId = result.Id.ToString(),
-            Description = $"Page '{result.Name}' was created",
-            UserId = request.CreatedBy
-        });
-        return result;
+            var result = await _pageService.CreatePageAsync(
+                new CreatePageRequest
+                {
+                    AppId = request.AppId,
+                    Name = request.Name,
+                    Description = request.Description,
+                    DisplayOrder = request.DisplayOrder
+                },
+                request.CreatedBy, cancellationToken);
+
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 30,  // PageCreated
+                EntityType = 3,   // Page
+                EntityId = result.Id.ToString(),
+                Description = $"Page '{result.Name}' was created",
+                UserId = request.CreatedBy,
+                IsSuccess = true
+            });
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 30,  // PageCreated
+                EntityType = 3,   // Page
+                Description = $"Unexpected error creating page {request.Name}",
+                UserId = request.CreatedBy,
+                IsSuccess = false,
+                FailureReason = ex.Message
+            });
+            throw;
+        }
     }
 }

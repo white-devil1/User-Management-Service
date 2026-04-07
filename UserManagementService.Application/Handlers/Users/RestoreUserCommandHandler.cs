@@ -28,45 +28,78 @@ public class RestoreUserCommandHandler
     public async Task<bool> Handle(
         RestoreUserCommand request, CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByIdAsync(request.Id);
-        if (user == null)
-            throw new NotFoundException("User", request.Id);
-        if (!user.IsDeleted)
-            throw new ValidationException("User is not deleted. Nothing to restore.");
-
-        user.IsDeleted = false;
-        user.DeletedAt = null;
-        user.DeletedBy = null;
-        user.IsActive = true;
-        user.UpdatedAt = DateTime.UtcNow;
-
-        var result = await _userManager.UpdateAsync(user);
-        if (!result.Succeeded)
-            throw new ValidationException(
-                result.Errors.Select(e => e.Description).ToList());
-
-        await _eventPublisher.PublishAsync(new UserRestoredEvent
+try
         {
-            UserId = user.Id,
-            TenantId = user.TenantId,
-            BranchId = user.BranchId,
-            IsDeleted = false,
-            IsActive = true,
-            RestoredAt = user.UpdatedAt
-        }, cancellationToken);
-
-        _logPublisher.PublishActivity(new ActivityLogEvent
+        
+                var user = await _userManager.FindByIdAsync(request.Id);
+                if (user == null)
+                    throw new NotFoundException("User", request.Id);
+                if (!user.IsDeleted)
+                    throw new ValidationException("User is not deleted. Nothing to restore.");
+        
+                user.IsDeleted = false;
+                user.DeletedAt = null;
+                user.DeletedBy = null;
+                user.IsActive = true;
+                user.UpdatedAt = DateTime.UtcNow;
+        
+                var result = await _userManager.UpdateAsync(user);
+                if (!result.Succeeded)
+                    throw new ValidationException(
+                        result.Errors.Select(e => e.Description).ToList());
+        
+                await _eventPublisher.PublishAsync(new UserRestoredEvent
+                {
+                    UserId = user.Id,
+                    TenantId = user.TenantId,
+                    BranchId = user.BranchId,
+                    IsDeleted = false,
+                    IsActive = true,
+                    RestoredAt = user.UpdatedAt
+                }, cancellationToken);
+        
+                _logPublisher.PublishActivity(new ActivityLogEvent
+                {
+                    ActionType = 3,  // UserRestored
+                    EntityType = 0,  // User
+                    EntityId = user.Id,
+                    Description = $"User {user.Email} was restored",
+                    UserId = user.Id,
+                    UserEmail = user.Email,
+                    TenantId = user.TenantId,
+                    BranchId = user.BranchId
+                });
+        
+                return true;
+        }
+        catch (NotFoundException)
         {
-            ActionType = 3,  // UserRestored
-            EntityType = 0,  // User
-            EntityId = user.Id,
-            Description = $"User {user.Email} was restored",
-            UserId = user.Id,
-            UserEmail = user.Email,
-            TenantId = user.TenantId,
-            BranchId = user.BranchId
-        });
-
-        return true;
+            throw;
+        }
+        catch (ValidationException)
+        {
+            throw;
+        }
+        catch (ConflictException)
+        {
+            throw;
+        }
+        catch (UnauthorizedException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logPublisher.PublishActivity(new ActivityLogEvent
+            {
+                ActionType = 4,  // UserRestored
+                EntityType = 0,
+                Description = $"Unexpected error in UserRestored",
+                UserId = request.RestoredBy,
+                IsSuccess = false,
+                FailureReason = ex.Message
+            });
+            throw;
+        }
     }
 }
