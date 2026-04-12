@@ -18,7 +18,6 @@ public class ListAppsCommandHandler : IRequestHandler<ListAppsCommand, AppListRe
     {
         return await _appService.GetAppsAsync(
             request.Search,
-            request.Code,
             request.IsActive,
             request.IncludeDeleted,
             request.Page,

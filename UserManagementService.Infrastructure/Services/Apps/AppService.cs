@@ -21,7 +21,6 @@ public class AppService : IAppService
 
     public async Task<AppListResponse> GetAppsAsync(
         string? search,
-        string? code,
         bool? isActive,
         bool includeDeleted,
         int page,
@@ -32,15 +31,14 @@ public class AppService : IAppService
     {
         var query = _context.Apps.AsQueryable();
 
-        // ✅ Apply Filters
+        // ✅ Apply Filters - Trim and case-insensitive search using ToLower()
         if (!string.IsNullOrEmpty(search))
         {
-            query = query.Where(a => a.Name.Contains(search) || a.Code.Contains(search));
-        }
-
-        if (!string.IsNullOrEmpty(code))
-        {
-            query = query.Where(a => a.Code == code);
+            var searchTrimmed = search.Trim().ToLower();
+            query = query.Where(a => 
+                a.Name.ToLower().Contains(searchTrimmed) || 
+                a.Code.ToLower().Contains(searchTrimmed) || 
+                (a.Description != null && a.Description.ToLower().Contains(searchTrimmed)));
         }
 
         if (isActive.HasValue)

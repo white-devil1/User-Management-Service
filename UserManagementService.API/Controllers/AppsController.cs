@@ -22,7 +22,6 @@ public class AppsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<AppListResponse>>> GetApps(
         [FromQuery] string? search,
-        [FromQuery] string? code,
         [FromQuery] bool? isActive,
         [FromQuery] bool includeDeleted = false,
         [FromQuery] int page = 1,
@@ -33,7 +32,6 @@ public class AppsController : ControllerBase
         var command = new ListAppsCommand
         {
             Search = search,
-            Code = code,
             IsActive = isActive,
             IncludeDeleted = includeDeleted,
             Page = page,

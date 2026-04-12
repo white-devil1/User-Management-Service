@@ -6,7 +6,6 @@ public interface IAppService
 {
     Task<AppListResponse> GetAppsAsync(
         string? search,
-        string? code,
         bool? isActive,
         bool includeDeleted,
         int page,
