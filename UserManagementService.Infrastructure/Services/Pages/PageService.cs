@@ -27,7 +27,7 @@ public class PageService : IPageService
         string sortOrder,
         CancellationToken cancellationToken = default)
     {
-        var query = _context.Pages.AsQueryable();  // ✅ Start with ALL pages
+        var query = _context.Pages.Include(p => p.App).AsQueryable();  // ✅ Include App navigation & start with ALL pages
 
         // ✅ Apply appId filter ONLY if provided
         if (appId.HasValue)
@@ -36,9 +36,13 @@ public class PageService : IPageService
         }
 
         // ✅ Apply Filters
-        if (!string.IsNullOrEmpty(search))
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(p => p.Name.Contains(search) || p.Code.Contains(search));
+            var trimmedSearch = search.Trim();
+            query = query.Where(p => 
+                EF.Functions.ILike(p.Name, $"%{trimmedSearch}%") || 
+                EF.Functions.ILike(p.Code, $"%{trimmedSearch}%") || 
+                (p.Description != null && EF.Functions.ILike(p.Description, $"%{trimmedSearch}%")));
         }
 
         if (isActive.HasValue)
@@ -92,6 +96,7 @@ public class PageService : IPageService
     public async Task<PageDto> GetPageByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var page = await _context.Pages
+            .Include(p => p.App)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
         if (page == null)
@@ -229,6 +234,7 @@ public class PageService : IPageService
         {
             Id = page.Id,
             AppId = page.AppId,
+            AppName = page.App?.Name,
             Name = page.Name,
             Code = page.Code,
             Description = page.Description,
