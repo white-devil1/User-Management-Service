@@ -4,6 +4,9 @@ public class AppActionDto
 {
     public Guid Id { get; set; }
     public Guid PageId { get; set; }
+    public string? PageName { get; set; }
+    public Guid? AppId { get; set; }
+    public string? AppName { get; set; }
     public string Name { get; set; } = default!;
     public string Code { get; set; } = default!;
     public string Type { get; set; } = "Button";  // Button, Menu, API

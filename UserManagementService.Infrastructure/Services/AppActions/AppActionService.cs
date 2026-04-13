@@ -28,9 +28,9 @@ public class AppActionService : IAppActionService
         string sortOrder,
         CancellationToken cancellationToken = default)
     {
-        // ✅ Start with ALL actions, include Page for App filtering
+        // ✅ Start with ALL actions, include Page + App for navigation
         var query = _context.Actions
-            .Include(a => a.Page)  // ✅ Needed to filter by AppId through Page
+            .Include(a => a.Page).ThenInclude(p => p.App)
             .AsQueryable();
 
         // ✅ Apply appId filter ONLY if provided
@@ -46,9 +46,13 @@ public class AppActionService : IAppActionService
         }
 
         // ✅ Apply Filters
-        if (!string.IsNullOrEmpty(search))
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(a => a.Name.Contains(search) || a.Code.Contains(search));
+            var trimmedSearch = search.Trim();
+            query = query.Where(a => 
+                EF.Functions.ILike(a.Name, $"%{trimmedSearch}%") || 
+                EF.Functions.ILike(a.Code, $"%{trimmedSearch}%") || 
+                (a.Description != null && EF.Functions.ILike(a.Description, $"%{trimmedSearch}%")));
         }
 
         if (isActive.HasValue)
@@ -102,6 +106,7 @@ public class AppActionService : IAppActionService
     public async Task<AppActionDto> GetActionByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var action = await _context.Actions
+            .Include(a => a.Page).ThenInclude(p => p.App)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (action == null)
@@ -291,6 +296,9 @@ public class AppActionService : IAppActionService
         {
             Id = action.Id,
             PageId = action.PageId,
+            PageName = action.Page?.Name,
+            AppId = action.Page?.AppId,
+            AppName = action.Page?.App?.Name,
             Name = action.Name,
             Code = action.Code,
             Type = action.Type,
