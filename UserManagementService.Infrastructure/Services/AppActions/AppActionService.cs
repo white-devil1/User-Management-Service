@@ -30,7 +30,7 @@ public class AppActionService : IAppActionService
     {
         // ✅ Start with ALL actions, include Page + App for navigation
         var query = _context.Actions
-            .Include(a => a.Page).ThenInclude(p => p.App)
+            .Include(a => a.Page).ThenInclude(p => p!.App)
             .AsQueryable();
 
         // ✅ Apply appId filter ONLY if provided
@@ -106,7 +106,7 @@ public class AppActionService : IAppActionService
     public async Task<AppActionDto> GetActionByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var action = await _context.Actions
-            .Include(a => a.Page).ThenInclude(p => p.App)
+            .Include(a => a.Page).ThenInclude(p => p!.App)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (action == null)
@@ -255,11 +255,23 @@ public class AppActionService : IAppActionService
             throw new NotFoundException("Action", id);
         }
 
-        // ✅ Soft Delete
+        // ✅ Soft Delete Action
         action.IsDeleted = true;
         action.DeletedAt = DateTime.UtcNow;
         action.DeletedBy = deletedBy;
         action.UpdatedAt = DateTime.UtcNow;
+
+        // ✅ Also soft-delete the associated Permission
+        var permission = await _context.Permissions
+            .FirstOrDefaultAsync(p => p.ActionId == id, cancellationToken);
+
+        if (permission != null)
+        {
+            permission.IsDeleted = true;
+            permission.DeletedAt = DateTime.UtcNow;
+            permission.DeletedBy = deletedBy;
+            permission.UpdatedAt = DateTime.UtcNow;
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
 

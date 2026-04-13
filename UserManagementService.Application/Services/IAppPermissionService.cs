@@ -25,4 +25,17 @@ public interface IAppPermissionService
         bool isEnabled,
         string updatedBy,
         CancellationToken cancellationToken = default);
+
+    Task<TogglePermissionResponseDto> TogglePermissionWithActionNameAsync(
+        Guid id,
+        bool isEnabled,
+        string updatedBy,
+        CancellationToken cancellationToken = default);
+
+    // Grouped Query Operation
+    Task<GroupedPermissionResponse> GetGroupedPermissionsAsync(
+        Guid? appId,
+        Guid? pageId,
+        bool? isEnabled,
+        CancellationToken cancellationToken = default);
 }

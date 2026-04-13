@@ -131,6 +131,142 @@ public class AppPermissionService : IAppPermissionService
         return MapToDto(permission);
     }
 
+    public async Task<TogglePermissionResponseDto> TogglePermissionWithActionNameAsync(
+        Guid id,
+        bool isEnabled,
+        string updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        var permission = await _context.Permissions
+            .Include(p => p.Action).ThenInclude(a => a!.Page).ThenInclude(p => p!.App)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+        if (permission == null)
+        {
+            throw new NotFoundException("Permission", id);
+        }
+
+        permission.IsEnabled = isEnabled;
+        permission.UpdatedBy = updatedBy;
+        permission.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new TogglePermissionResponseDto
+        {
+            Id = permission.Id,
+            ActionName = permission.Action?.Name ?? "Unknown",
+            IsEnabled = permission.IsEnabled,
+            UpdatedAt = permission.UpdatedAt,
+            UpdatedBy = permission.UpdatedBy
+        };
+    }
+
+    public async Task<GroupedPermissionResponse> GetGroupedPermissionsAsync(
+        Guid? appId,
+        Guid? pageId,
+        bool? isEnabled,
+        CancellationToken cancellationToken = default)
+    {
+        // ✅ Load permissions with navigation properties
+        var query = _context.Permissions
+            .Include(p => p.Action).ThenInclude(a => a!.Page).ThenInclude(p => p!.App)
+            .AsQueryable();
+
+        // ✅ Always filter out soft-deleted (no includeDeleted param)
+        query = query.Where(p => !p.IsDeleted);
+
+        // ✅ Apply appId filter ONLY if provided
+        if (appId.HasValue)
+        {
+            query = query.Where(p => p.AppId == appId.Value);
+        }
+
+        // ✅ Apply pageId filter ONLY if provided
+        if (pageId.HasValue)
+        {
+            query = query.Where(p => p.PageId == pageId.Value);
+        }
+
+        // ✅ Apply isEnabled filter ONLY if provided
+        if (isEnabled.HasValue)
+        {
+            query = query.Where(p => p.IsEnabled == isEnabled.Value);
+        }
+
+        var permissions = await query.ToListAsync(cancellationToken);
+
+        // ✅ Group in memory: App → Page → Permission
+        var groupedResponse = new GroupedPermissionResponse();
+
+        var appGroups = permissions
+            .GroupBy(p => new { p.AppId, AppName = GetAppName(p) })
+            .OrderBy(g => g.Key.AppName);
+
+        foreach (var appGroup in appGroups)
+        {
+            var appDto = new GroupedAppDto
+            {
+                AppId = appGroup.Key.AppId,
+                AppName = appGroup.Key.AppName
+            };
+
+            var pageGroups = appGroup
+                .GroupBy(p => new { p.PageId, PageName = GetPageName(p) })
+                .OrderBy(g => g.Key.PageName);
+
+            foreach (var pageGroup in pageGroups)
+            {
+                var pageDto = new GroupedPageDto
+                {
+                    PageId = pageGroup.Key.PageId,
+                    PageName = pageGroup.Key.PageName,
+                    Permissions = pageGroup
+                        .OrderBy(p => p.Action?.Name)
+                        .Select(p => new GroupedPermissionDto
+                        {
+                            Id = p.Id,
+                            ActionName = p.Action?.Name ?? "Unknown",
+                            IsEnabled = p.IsEnabled
+                        })
+                        .ToList()
+                };
+
+                appDto.Pages.Add(pageDto);
+            }
+
+            groupedResponse.Apps.Add(appDto);
+        }
+
+        return groupedResponse;
+    }
+
+    // ✅ Helper: Resolve App name from Permission (uses Name field as fallback)
+    private static string GetAppName(Permission p)
+    {
+        if (p.Action?.Page?.App?.Name != null) return p.Action.Page.App.Name;
+        // Fallback: extract from Name field (format: "AppName - PageName - ActionName")
+        if (!string.IsNullOrEmpty(p.Name))
+        {
+            var parts = p.Name.Split(" - ");
+            if (parts.Length >= 1) return parts[0];
+        }
+        return "Unknown App";
+    }
+
+    // ✅ Helper: Resolve Page name from Permission (uses Name field as fallback)
+    private static string GetPageName(Permission p)
+    {
+        if (p.Action?.Page?.Name != null) return p.Action.Page.Name;
+        // Fallback: extract from Name field
+        if (!string.IsNullOrEmpty(p.Name))
+        {
+            var parts = p.Name.Split(" - ");
+            if (parts.Length >= 2) return parts[1];
+        }
+        return "Unknown Page";
+    }
+
     // ✅ Helper: Map Entity to DTO
     private static AppPermissionDto MapToDto(Permission permission)
     {

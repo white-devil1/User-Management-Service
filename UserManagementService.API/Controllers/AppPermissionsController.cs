@@ -19,36 +19,33 @@ public class AppPermissionsController : ControllerBase
     private string GetUserId()
         => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
+    // ✅ Endpoint 1: Get All Permissions (Grouped by App → Page → Permission)
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<AppPermissionListResponse>>>
+    public async Task<ActionResult<ApiResponse<GroupedPermissionResponse>>>
         GetPermissions(
         [FromQuery] Guid? appId,
         [FromQuery] Guid? pageId,
-        [FromQuery] Guid? actionId,
-        [FromQuery] bool? isEnabled,
-        [FromQuery] bool includeDeleted = false,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "CreatedAt",
-        [FromQuery] string sortOrder = "desc")
+        [FromQuery] bool? isEnabled)
     {
-        var command = new ListAppPermissionsCommand
+        var command = new GetGroupedPermissionsCommand
         {
             AppId = appId,
             PageId = pageId,
-            ActionId = actionId,
-            IsEnabled = isEnabled,
-            IncludeDeleted = includeDeleted,
-            Page = page,
-            PageSize = pageSize,
-            SortBy = sortBy,
-            SortOrder = sortOrder
+            IsEnabled = isEnabled
         };
         var result = await _mediator.Send(command);
-        return Ok(ApiResponse<AppPermissionListResponse>.Ok(
-            result, "Permissions retrieved successfully"));
+
+        if (result.Apps.Count == 0)
+        {
+            return Ok(ApiResponse<GroupedPermissionResponse>.Ok(
+                result, "No permissions found"));
+        }
+
+        return Ok(ApiResponse<GroupedPermissionResponse>.Ok(
+            result, "Permissions fetched successfully"));
     }
 
+    // ✅ Get Permission by ID (kept for backward compat)
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<AppPermissionDto>>>
         GetPermissionById(Guid id)
@@ -59,20 +56,20 @@ public class AppPermissionsController : ControllerBase
             result, "Permission retrieved successfully"));
     }
 
-    [HttpPatch("{id:guid}/toggle")]
-    public async Task<ActionResult<ApiResponse<AppPermissionDto>>>
-        TogglePermission(
+    // ✅ Endpoint 2: Toggle Single Permission Status
+    [HttpPatch("{id:guid}/status")]
+    public async Task<ActionResult<ApiResponse<TogglePermissionResponseDto>>>
+        TogglePermissionStatus(
         Guid id, [FromBody] ToggleAppPermissionRequest request)
     {
-        var command = new ToggleAppPermissionCommand
+        var command = new TogglePermissionStatusCommand
         {
             Id = id,
             IsEnabled = request.IsEnabled,
             UpdatedBy = GetUserId()
         };
         var result = await _mediator.Send(command);
-        var msg = request.IsEnabled
-            ? "Permission enabled" : "Permission disabled";
-        return Ok(ApiResponse<AppPermissionDto>.Ok(result, msg));
+        return Ok(ApiResponse<TogglePermissionResponseDto>.Ok(
+            result, "Permission updated successfully"));
     }
 }
