@@ -288,4 +288,46 @@ public class AppPermissionService : IAppPermissionService
             DeletedBy = permission.DeletedBy
         };
     }
+
+    public async Task<BulkTogglePermissionResponse> BulkTogglePermissionStatusAsync(
+        List<BulkToggleItem> permissionStatuses,
+        string updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<TogglePermissionResponseDto>();
+        var now = DateTime.UtcNow;
+
+        foreach (var item in permissionStatuses)
+        {
+            var permission = await _context.Permissions
+                .Include(p => p.Action).ThenInclude(a => a!.Page).ThenInclude(p => p!.App)
+                .FirstOrDefaultAsync(p => p.Id == item.PermissionId, cancellationToken);
+
+            if (permission == null)
+            {
+                throw new NotFoundException("Permission", item.PermissionId);
+            }
+
+            permission.IsEnabled = item.IsEnabled;
+            permission.UpdatedBy = updatedBy;
+            permission.UpdatedAt = now;
+
+            results.Add(new TogglePermissionResponseDto
+            {
+                Id = permission.Id,
+                ActionName = permission.Action?.Name ?? "Unknown",
+                IsEnabled = permission.IsEnabled,
+                UpdatedAt = permission.UpdatedAt,
+                UpdatedBy = permission.UpdatedBy
+            });
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new BulkTogglePermissionResponse
+        {
+            UpdatedCount = results.Count,
+            Results = results
+        };
+    }
 }

@@ -72,4 +72,20 @@ public class AppPermissionsController : ControllerBase
         return Ok(ApiResponse<TogglePermissionResponseDto>.Ok(
             result, "Permission updated successfully"));
     }
+
+    // ✅ Endpoint 3: Bulk Toggle Permission Status
+    [HttpPatch("bulk-status")]
+    public async Task<ActionResult<ApiResponse<BulkTogglePermissionResponse>>>
+        BulkTogglePermissionStatus(
+        [FromBody] BulkTogglePermissionRequest request)
+    {
+        var command = new BulkTogglePermissionStatusCommand
+        {
+            PermissionStatuses = request.PermissionStatuses,
+            UpdatedBy = GetUserId()
+        };
+        var result = await _mediator.Send(command);
+        return Ok(ApiResponse<BulkTogglePermissionResponse>.Ok(
+            result, $"{result.UpdatedCount} permissions updated successfully"));
+    }
 }

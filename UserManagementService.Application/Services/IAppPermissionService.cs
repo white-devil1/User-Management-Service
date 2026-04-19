@@ -38,4 +38,10 @@ public interface IAppPermissionService
         Guid? pageId,
         bool? isEnabled,
         CancellationToken cancellationToken = default);
+
+    // Bulk Toggle Operation
+    Task<BulkTogglePermissionResponse> BulkTogglePermissionStatusAsync(
+        List<BulkToggleItem> permissionStatuses,
+        string updatedBy,
+        CancellationToken cancellationToken = default);
 }
