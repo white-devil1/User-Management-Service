@@ -16,15 +16,21 @@ public class CreateUserCommandHandler
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEventPublisher _eventPublisher;
     private readonly ILogPublisher _logPublisher;
+    private readonly IEmailService _emailService;
+    private readonly IPasswordGenerator _passwordGenerator;
 
     public CreateUserCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEventPublisher eventPublisher,
-        ILogPublisher logPublisher)
+        ILogPublisher logPublisher,
+        IEmailService emailService,
+        IPasswordGenerator passwordGenerator)
     {
         _userManager = userManager;
         _eventPublisher = eventPublisher;
         _logPublisher = logPublisher;
+        _emailService = emailService;
+        _passwordGenerator = passwordGenerator;
     }
 
     public async Task<UserResponse> Handle(
@@ -48,6 +54,9 @@ public class CreateUserCommandHandler
                     $"A user with email '{request.Email}' already exists.");
             }
 
+            // Generate temporary password
+            var tempPassword = _passwordGenerator.GenerateTempPassword();
+
             var user = new ApplicationUser
             {
                 UserName = request.UserName,
@@ -56,16 +65,19 @@ public class CreateUserCommandHandler
                 LastName = request.LastName,
                 TenantId = request.TenantId,
                 BranchId = request.BranchId,
-                IsSuperAdmin = request.IsSuperAdmin,
+                // IsSuperAdmin is not set - relies on DB default (false)
                 IsActive = request.IsActive,
                 IsDeleted = false,
+                IsTemporaryPassword = true,
+                MustChangePassword = true,
+                TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(24),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = request.CreatedBy,
                 UpdatedAt = DateTime.UtcNow,
                 UpdatedBy = request.CreatedBy
             };
 
-            var result = await _userManager.CreateAsync(user, request.Password);
+            var result = await _userManager.CreateAsync(user, tempPassword);
             if (!result.Succeeded)
             {
                 var errors = string.Join("; ", result.Errors.Select(e => e.Description));
@@ -102,6 +114,15 @@ public class CreateUserCommandHandler
                         addRolesResult.Errors.Select(e => e.Description).ToList());
                 }
             }
+
+            // Send welcome email with credentials
+            var userName = user.FirstName ?? user.UserName;
+            await _emailService.SendWelcomeEmailAsync(
+                user.Email!,
+                userName ?? user.UserName ?? "User",
+                user.UserName!,
+                tempPassword,
+                cancellationToken);
 
             await _eventPublisher.PublishAsync(new UserCreatedEvent
             {

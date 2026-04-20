@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using UserManagementService.Application.Services;
+using UserManagementService.Application.Services.Password;
 using UserManagementService.Domain.Configuration;
 using UserManagementService.Domain.Entities.Identity;
 using UserManagementService.Infrastructure.Persistence;
@@ -89,6 +90,9 @@ public static class DependencyInjection
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IEmailTemplateService, EmailTemplateService>();
         services.AddScoped<IEmailProvider, SmtpEmailProvider>();
+
+        // Password Generator Service
+        services.AddScoped<IPasswordGenerator, PasswordGenerator>();
 
         // OTP Service
         services.AddScoped<IOtpService, OtpService>();
