@@ -94,9 +94,30 @@ public class CreateUserCommandHandler
                     result.Errors.Select(e => e.Description).ToList());
             }
 
-            if (request.RoleNames.Any())
+            List<string> roleNames = new();
+            if (request.RoleIds.Any())
             {
-                var addRolesResult = await _userManager.AddToRolesAsync(user, request.RoleNames);
+                foreach (var roleId in request.RoleIds)
+                {
+                    var role = await _userManager.FindByIdAsync(roleId.ToString());
+                    if (role == null)
+                    {
+                        _logPublisher.PublishActivity(new ActivityLogEvent
+                        {
+                            ActionType = 0,  // UserCreated
+                            EntityType = 0,  // User
+                            Description = $"Failed to assign role - role not found: {roleId}",
+                            UserId = request.CreatedBy,
+                            IsSuccess = false,
+                            FailureReason = $"Role ID '{roleId}' does not exist."
+                        });
+                        throw new ValidationException(
+                            new List<string> { $"Role ID '{roleId}' does not exist." });
+                    }
+                    roleNames.Add(role.Name!);
+                }
+
+                var addRolesResult = await _userManager.AddToRolesAsync(user, roleNames);
                 if (!addRolesResult.Succeeded)
                 {
                     var errors = string.Join("; ", addRolesResult.Errors.Select(e => e.Description));
@@ -135,7 +156,7 @@ public class CreateUserCommandHandler
                 BranchId = user.BranchId,
                 IsSuperAdmin = user.IsSuperAdmin,
                 IsActive = user.IsActive,
-                Roles = request.RoleNames,
+                Roles = roleNames,
                 CreatedAt = user.CreatedAt,
                 CreatedBy = user.CreatedBy
             }, cancellationToken);
@@ -162,7 +183,7 @@ public class CreateUserCommandHandler
                 IsSuccess = true
             });
 
-            return MapToUserResponse(user, new List<string>(request.RoleNames));
+            return MapToUserResponse(user, roleNames);
         }
         catch (ConflictException)
         {

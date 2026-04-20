@@ -12,7 +12,7 @@ public class UpdateUserCommand : IRequest<UserResponse>
     public string? LastName { get; set; }
     public bool? IsActive { get; set; }
     public Guid? BranchId { get; set; }
-    public List<string>? RoleNames { get; set; }
+    public List<Guid>? RoleIds { get; set; }
 
     // ✅ AUDIT FIELD (Added)
     public string? UpdatedBy { get; set; }
