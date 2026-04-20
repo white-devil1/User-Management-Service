@@ -14,15 +14,18 @@ public class AdminResetPasswordCommandHandler
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
     private readonly ILogPublisher _logPublisher;
+    private readonly IPasswordGenerator _passwordGenerator;
 
     public AdminResetPasswordCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
-        ILogPublisher logPublisher)
+        ILogPublisher logPublisher,
+        IPasswordGenerator passwordGenerator)
     {
         _userManager = userManager;
         _emailService = emailService;
         _logPublisher = logPublisher;
+        _passwordGenerator = passwordGenerator;
     }
 
     public async Task<bool> Handle(
@@ -33,7 +36,7 @@ public class AdminResetPasswordCommandHandler
         if (user == null || user.IsDeleted)
             throw new NotFoundException("User", request.UserId);
 
-        var tempPassword = request.NewPassword ?? GenerateTempPassword();
+        var tempPassword = request.NewPassword ?? _passwordGenerator.GenerateTempPassword();
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
         var result = await _userManager.ResetPasswordAsync(
@@ -72,25 +75,5 @@ public class AdminResetPasswordCommandHandler
         });
 
         return true;
-    }
-
-    private string GenerateTempPassword()
-    {
-        var random = new Random();
-        var uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[random.Next(26)].ToString();
-        var lowercase = "abcdefghijklmnopqrstuvwxyz"[random.Next(26)].ToString();
-        var digit = "0123456789"[random.Next(10)].ToString();
-        var special = "@#$!%^&*"[random.Next(8)].ToString();
-        const string all =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!%^&*";
-        var remaining = new string(Enumerable.Repeat(all, 8)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
-        var chars = (uppercase + lowercase + digit + special + remaining).ToCharArray();
-        for (int i = chars.Length - 1; i > 0; i--)
-        {
-            int j = random.Next(i + 1);
-            (chars[i], chars[j]) = (chars[j], chars[i]);
-        }
-        return new string(chars);
     }
 }

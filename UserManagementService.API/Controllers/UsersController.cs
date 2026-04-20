@@ -92,12 +92,10 @@ public class UsersController : ControllerBase
         {
             Email = request.Email,
             UserName = request.UserName,
-            Password = request.Password,
             FirstName = request.FirstName,
             LastName = request.LastName,
             TenantId = request.TenantId,
             BranchId = request.BranchId,
-            IsSuperAdmin = request.IsSuperAdmin,
             IsActive = request.IsActive,
             RoleNames = request.RoleNames,
             CreatedBy = GetUserId()

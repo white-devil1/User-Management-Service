@@ -9,4 +9,6 @@ public interface IEmailService
     Task<bool> SendOtpEmailAsync(string toEmail, string toName, string otp, string purpose, CancellationToken cancellationToken = default);
 
     Task<bool> SendAdminResetPasswordEmailAsync(string toEmail, string toName, string username, string tempPassword, CancellationToken cancellationToken = default);
+    
+    Task<bool> SendWelcomeEmailAsync(string toEmail, string toName, string username, string tempPassword, CancellationToken cancellationToken = default);
 }

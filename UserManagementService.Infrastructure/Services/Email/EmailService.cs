@@ -117,4 +117,32 @@ public class EmailService : IEmailService
             HtmlBody = htmlBody
         }, cancellationToken);
     }
+
+    public async Task<bool> SendWelcomeEmailAsync(
+        string toEmail,
+        string toName,
+        string username,
+        string tempPassword,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("📧 Sending welcome email to {ToEmail}", toEmail);
+
+        var subject = "Welcome! Your Account is Ready";
+
+        var htmlBody = _templateService.GenerateWelcomeEmailTemplate(
+            toName,
+            username,
+            tempPassword,
+            _emailSettings.CompanyName,
+            _emailSettings.CompanyUrl
+        );
+
+        return await SendEmailAsync(new EmailDto
+        {
+            ToEmail = toEmail,
+            ToName = toName,
+            Subject = subject,
+            HtmlBody = htmlBody
+        }, cancellationToken);
+    }
 }
