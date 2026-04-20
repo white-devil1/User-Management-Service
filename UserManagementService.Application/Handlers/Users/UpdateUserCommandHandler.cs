@@ -86,7 +86,7 @@ public class UpdateUserCommandHandler
                     result.Errors.Select(e => e.Description).ToList());
             }
 
-            if (request.RoleIds != null)
+            if (request.RoleNames != null)
             {
                 var currentRoles = await _userManager.GetRolesAsync(user);
                 var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
@@ -107,29 +107,7 @@ public class UpdateUserCommandHandler
                         removeResult.Errors.Select(e => e.Description).ToList());
                 }
                 
-                List<string> roleNames = new();
-                foreach (var roleId in request.RoleIds)
-                {
-                    var role = await _userManager.FindByIdAsync(roleId.ToString());
-                    if (role == null)
-                    {
-                        _logPublisher.PublishActivity(new ActivityLogEvent
-                        {
-                            ActionType = 1,  // UserUpdated
-                            EntityType = 0,  // User
-                            EntityId = user.Id,
-                            Description = $"Failed to assign role - role not found: {roleId}",
-                            UserId = request.UpdatedBy,
-                            IsSuccess = false,
-                            FailureReason = $"Role ID '{roleId}' does not exist."
-                        });
-                        throw new ValidationException(
-                            new List<string> { $"Role ID '{roleId}' does not exist." });
-                    }
-                    roleNames.Add(role.Name!);
-                }
-
-                var addResult = await _userManager.AddToRolesAsync(user, roleNames);
+                var addResult = await _userManager.AddToRolesAsync(user, request.RoleNames);
                 if (!addResult.Succeeded)
                 {
                     var errors = string.Join("; ", addResult.Errors.Select(e => e.Description));

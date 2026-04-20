@@ -12,7 +12,7 @@ public class CreateUserCommand : IRequest<UserResponse>
     public Guid TenantId { get; set; }
     public Guid? BranchId { get; set; }
     public bool IsActive { get; set; } = true;
-    public List<Guid> RoleIds { get; set; } = new();
+    public List<string> RoleNames { get; set; } = new();
 
     // ✅ AUDIT FIELD (Added)
     public string? CreatedBy { get; set; }
