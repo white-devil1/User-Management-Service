@@ -25,7 +25,7 @@ public class UsersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<UserListResponse>>> GetUsers(
         [FromQuery] string? search,
-        [FromQuery] List<string> status,
+        [FromQuery] string? status,  // Changed from List<string> to string
         [FromQuery] Guid? tenantId,
         [FromQuery] Guid? branchId,
         [FromQuery] string? roleId,
@@ -34,17 +34,26 @@ public class UsersController : ControllerBase
         [FromQuery] string sortBy = "createdAt",
         [FromQuery] string sortOrder = "desc")
     {
+        // Parse status: supports both comma-separated and multiple query params
+        var statusList = new List<string>();
+        if (!string.IsNullOrEmpty(status))
+        {
+            statusList = status.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim().ToLower())
+                .ToList();
+        }
+        
         if (!IsSuperAdmin() && !string.IsNullOrEmpty(GetTenantIdStr()))
             tenantId = Guid.Parse(GetTenantIdStr()!);
-        if (!IsSuperAdmin() && status != null && status.Contains("deleted"))
+        if (!IsSuperAdmin() && statusList.Any() && statusList.Contains("deleted"))
         {
-            status = status.Where(s => s != "deleted").ToList();
-            if (!status.Any()) status = new List<string> { "active" };
+            statusList = statusList.Where(s => s != "deleted").ToList();
+            if (!statusList.Any()) statusList = new List<string> { "active" };
         }
         var command = new ListUsersCommand
         {
             Search = search,
-            Status = status ?? new List<string> { "active" },
+            Status = statusList.Any() ? statusList : new List<string> { "active" },
             TenantId = tenantId,
             BranchId = branchId,
             RoleId = roleId,
