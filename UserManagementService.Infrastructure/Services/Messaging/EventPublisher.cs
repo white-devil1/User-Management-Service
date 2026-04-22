@@ -1,6 +1,7 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Polly;
 using RabbitMQ.Client;
 using UserManagementService.Application.Services;
 
@@ -10,13 +11,16 @@ public class EventPublisher : IEventPublisher
 {
     private readonly RabbitMqConnectionFactory _connectionFactory;
     private readonly ILogger<EventPublisher> _logger;
+    private readonly ResiliencePipeline _pipeline;
 
     public EventPublisher(
         RabbitMqConnectionFactory connectionFactory,
-        ILogger<EventPublisher> logger)
+        ILogger<EventPublisher> logger,
+        ResiliencePipelineProvider<string> pipelineProvider)
     {
         _connectionFactory = connectionFactory;
         _logger = logger;
+        _pipeline = pipelineProvider.GetPipeline("rabbitmq-publish");
     }
 
     public async Task PublishAsync<T>(
@@ -25,51 +29,48 @@ public class EventPublisher : IEventPublisher
         where T : class
     {
         var exchangeName = typeof(T).FullName!;
-        var json = JsonSerializer.Serialize(message);
-        var body = Encoding.UTF8.GetBytes(json);
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
 
         try
         {
-            var connection = _connectionFactory.GetConnection();
-
-            // Create a channel per publish — channels are lightweight
-            // The connection itself stays open (persistent)
-            await using var channel = await connection.CreateChannelAsync(
-                cancellationToken: cancellationToken);
-
-            // Declare fanout exchange — creates it if it does not exist
-            // durable: true = survives RabbitMQ restart
-            await channel.ExchangeDeclareAsync(
-                exchange: exchangeName,
-                type: ExchangeType.Fanout,
-                durable: true,
-                autoDelete: false,
-                cancellationToken: cancellationToken);
-
-            var props = new BasicProperties
+            await _pipeline.ExecuteAsync(async ct =>
             {
-                ContentType = "application/json",
-                DeliveryMode = DeliveryModes.Persistent,
-                MessageId = Guid.NewGuid().ToString(),
-                Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-            };
+                var connection = _connectionFactory.GetConnection();
+                await using var channel = await connection.CreateChannelAsync(cancellationToken: ct);
 
-            await channel.BasicPublishAsync(
-                exchange: exchangeName,
-                routingKey: string.Empty,
-                mandatory: false,
-                basicProperties: props,
-                body: body,
-                cancellationToken: cancellationToken);
+                await channel.ExchangeDeclareAsync(
+                    exchange: exchangeName,
+                    type: ExchangeType.Fanout,
+                    durable: true,
+                    autoDelete: false,
+                    cancellationToken: ct);
 
-            _logger.LogInformation(
-                "RabbitMQ: published {EventType} — MessageId: {MessageId}",
-                typeof(T).Name, props.MessageId);
+                var props = new BasicProperties
+                {
+                    ContentType = "application/json",
+                    DeliveryMode = DeliveryModes.Persistent,
+                    MessageId = Guid.NewGuid().ToString(),
+                    Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                };
+
+                await channel.BasicPublishAsync(
+                    exchange: exchangeName,
+                    routingKey: string.Empty,
+                    mandatory: false,
+                    basicProperties: props,
+                    body: body,
+                    cancellationToken: ct);
+
+                _logger.LogInformation(
+                    "RabbitMQ: published {EventType} — MessageId: {MessageId}",
+                    typeof(T).Name, props.MessageId);
+
+            }, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "RabbitMQ: failed to publish {EventType}", typeof(T).Name);
+                "RabbitMQ: failed to publish {EventType} after retries", typeof(T).Name);
             throw;
         }
     }

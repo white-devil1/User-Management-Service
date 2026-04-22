@@ -1,6 +1,8 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.CircuitBreaker;
 using RabbitMQ.Client;
 using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;
@@ -12,13 +14,16 @@ public class LogPublisher : ILogPublisher
 {
     private readonly RabbitMqConnectionFactory _connectionFactory;
     private readonly ILogger<LogPublisher> _logger;
+    private readonly ResiliencePipeline _pipeline;
 
     public LogPublisher(
         RabbitMqConnectionFactory connectionFactory,
-        ILogger<LogPublisher> logger)
+        ILogger<LogPublisher> logger,
+        ResiliencePipelineProvider<string> pipelineProvider)
     {
         _connectionFactory = connectionFactory;
         _logger = logger;
+        _pipeline = pipelineProvider.GetPipeline("rabbitmq-publish");
     }
 
     public void PublishError(ErrorLogEvent evt)
@@ -36,27 +41,33 @@ public class LogPublisher : ILogPublisher
         {
             try
             {
-                var connection = _connectionFactory.GetConnection();
-                await using var channel = await connection.CreateChannelAsync();
-                await channel.ExchangeDeclareAsync(
-                    exchange, ExchangeType.Fanout,
-                    durable: true, autoDelete: false);
-                var body = Encoding.UTF8.GetBytes(
-                    JsonSerializer.Serialize(message));
-                var props = new BasicProperties
+                await _pipeline.ExecuteAsync(async ct =>
                 {
-                    ContentType = "application/json",
-                    DeliveryMode = DeliveryModes.Persistent
-                };
-                await channel.BasicPublishAsync(
-                    exchange, string.Empty, false, props, body);
+                    var connection = _connectionFactory.GetConnection();
+                    await using var channel = await connection.CreateChannelAsync(cancellationToken: ct);
+                    await channel.ExchangeDeclareAsync(
+                        exchange, ExchangeType.Fanout,
+                        durable: true, autoDelete: false, cancellationToken: ct);
+                    var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
+                    var props = new BasicProperties
+                    {
+                        ContentType = "application/json",
+                        DeliveryMode = DeliveryModes.Persistent
+                    };
+                    await channel.BasicPublishAsync(exchange, string.Empty, false, props, body, ct);
+                });
+            }
+            catch (BrokenCircuitException)
+            {
+                // Circuit is open — log to Serilog as fallback so events are not completely silent
+                _logger.LogWarning(
+                    "LogPublisher: circuit open for {Exchange} — audit event dropped: {Payload}",
+                    exchange, JsonSerializer.Serialize(message));
             }
             catch (Exception ex)
             {
-                // Silent fail — only log to Serilog, never affect HTTP response
                 _logger.LogWarning(ex,
-                    "LogPublisher: failed to publish to {Exchange}",
-                    exchange);
+                    "LogPublisher: failed to publish to {Exchange}", exchange);
             }
         });
     }

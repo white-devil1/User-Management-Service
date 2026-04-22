@@ -47,9 +47,9 @@ public class ResetPasswordCommandHandler
             throw new ValidationException(
                 result.Errors.Select(e => e.Description).ToList());
 
-        user.MustChangePassword = true;
-        user.IsTemporaryPassword = true;
-        user.TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(24);
+        user.MustChangePassword = false;
+        user.IsTemporaryPassword = false;
+        user.TemporaryPasswordExpiresAt = null;
         user.LastPasswordChangedAt = DateTime.UtcNow;
         user.PasswordChangedCount += 1;
         user.UpdatedAt = DateTime.UtcNow;

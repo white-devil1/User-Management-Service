@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UserManagementService.Application.Common.Exceptions;
@@ -154,11 +155,19 @@ public class OtpService : IOtpService
         return Math.Max(0, maxAttempts - attempts);
     }
 
-    // ✅ Helper: Generate 6-digit OTP
-    private string GenerateOtpCode()
+    // Cryptographically secure 6-digit OTP with modulo bias elimination
+    private static string GenerateOtpCode()
     {
-        var random = new Random();
-        return random.Next(100000, 999999).ToString();
+        const uint range = 900000u; // 999999 - 100000 + 1
+        const uint limit = uint.MaxValue - (uint.MaxValue % range);
+        var buffer = new byte[4];
+        uint value;
+        do
+        {
+            RandomNumberGenerator.Fill(buffer);
+            value = BitConverter.ToUInt32(buffer, 0);
+        } while (value >= limit);
+        return (100000u + (value % range)).ToString();
     }
 
     // ✅ Helper: Get OTP attempts in last hour
