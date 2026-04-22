@@ -97,7 +97,7 @@ public class UsersController : ControllerBase
             TenantId = request.TenantId,
             BranchId = request.BranchId,
             IsActive = request.IsActive,
-            RoleNames = request.RoleNames,
+            RoleIds = request.RoleIds,
             CreatedBy = GetUserId()
         };
         var result = await _mediator.Send(command);

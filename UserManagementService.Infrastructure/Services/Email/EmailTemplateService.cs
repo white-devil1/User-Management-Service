@@ -186,8 +186,8 @@ public class EmailTemplateService : IEmailTemplateService
               <table width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""margin: 30px 0;"">
                 <tr>
                   <td align=""center"" style=""background-color: #D1FAE5; padding: 30px; border-radius: 8px; border: 2px solid #10B981;"">
-                    <!-- Username -->
-                    <p style=""color: #065F46; font-size: 14px; margin: 0 0 10px 0;"">Username</p>
+                    <!-- Email -->
+                    <p style=""color: #065F46; font-size: 14px; margin: 0 0 10px 0;"">Email</p>
                     <p style=""color: #10B981; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;"">{username}</p>
                     
                     <!-- Temporary Password -->

@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using System.Text.Json;
 using UserManagementService.Application.Commands.Users;
@@ -14,6 +14,7 @@ public class CreateUserCommandHandler
     : IRequestHandler<CreateUserCommand, UserResponse>
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly IEventPublisher _eventPublisher;
     private readonly ILogPublisher _logPublisher;
     private readonly IEmailService _emailService;
@@ -21,12 +22,14 @@ public class CreateUserCommandHandler
 
     public CreateUserCommandHandler(
         UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
         IEventPublisher eventPublisher,
         ILogPublisher logPublisher,
         IEmailService emailService,
         IPasswordGenerator passwordGenerator)
     {
         _userManager = userManager;
+        _roleManager = roleManager;
         _eventPublisher = eventPublisher;
         _logPublisher = logPublisher;
         _emailService = emailService;
@@ -43,8 +46,8 @@ public class CreateUserCommandHandler
             {
                 _logPublisher.PublishActivity(new ActivityLogEvent
                 {
-                    ActionType = 0,  // UserCreated
-                    EntityType = 0,  // User
+                    ActionType = 0,
+                    EntityType = 0,
                     Description = $"Failed to create user - email already exists: {request.Email}",
                     UserId = request.CreatedBy,
                     IsSuccess = false,
@@ -54,7 +57,16 @@ public class CreateUserCommandHandler
                     $"A user with email '{request.Email}' already exists.");
             }
 
-            // Generate temporary password
+            // Resolve role IDs to role names before any DB writes
+            var resolvedRoleNames = new List<string>();
+            foreach (var roleId in request.RoleIds)
+            {
+                var role = await _roleManager.FindByIdAsync(roleId);
+                if (role == null)
+                    throw new NotFoundException($"Role with ID '{roleId}' was not found.");
+                resolvedRoleNames.Add(role.Name!);
+            }
+
             var tempPassword = _passwordGenerator.GenerateTempPassword();
 
             var user = new ApplicationUser
@@ -65,7 +77,6 @@ public class CreateUserCommandHandler
                 LastName = request.LastName,
                 TenantId = request.TenantId,
                 BranchId = request.BranchId,
-                // IsSuperAdmin is not set - relies on DB default (false)
                 IsActive = request.IsActive,
                 IsDeleted = false,
                 IsTemporaryPassword = true,
@@ -83,8 +94,8 @@ public class CreateUserCommandHandler
                 var errors = string.Join("; ", result.Errors.Select(e => e.Description));
                 _logPublisher.PublishActivity(new ActivityLogEvent
                 {
-                    ActionType = 0,  // UserCreated
-                    EntityType = 0,  // User
+                    ActionType = 0,
+                    EntityType = 0,
                     Description = $"Failed to create user - validation errors",
                     UserId = request.CreatedBy,
                     IsSuccess = false,
@@ -94,16 +105,16 @@ public class CreateUserCommandHandler
                     result.Errors.Select(e => e.Description).ToList());
             }
 
-            if (request.RoleNames.Any())
+            if (resolvedRoleNames.Any())
             {
-                var addRolesResult = await _userManager.AddToRolesAsync(user, request.RoleNames);
+                var addRolesResult = await _userManager.AddToRolesAsync(user, resolvedRoleNames);
                 if (!addRolesResult.Succeeded)
                 {
                     var errors = string.Join("; ", addRolesResult.Errors.Select(e => e.Description));
                     _logPublisher.PublishActivity(new ActivityLogEvent
                     {
-                        ActionType = 0,  // UserCreated
-                        EntityType = 0,  // User
+                        ActionType = 0,
+                        EntityType = 0,
                         EntityId = user.Id,
                         Description = $"Failed to assign roles to user {user.Email}",
                         UserId = request.CreatedBy,
@@ -115,12 +126,12 @@ public class CreateUserCommandHandler
                 }
             }
 
-            // Send welcome email with credentials
-            var userName = user.FirstName ?? user.UserName;
+            // Send welcome email with email as login credential
+            var displayName = user.FirstName ?? user.UserName;
             await _emailService.SendWelcomeEmailAsync(
                 user.Email!,
-                userName ?? user.UserName ?? "User",
-                user.UserName!,
+                displayName ?? user.UserName ?? "User",
+                user.Email!,
                 tempPassword,
                 cancellationToken);
 
@@ -135,15 +146,15 @@ public class CreateUserCommandHandler
                 BranchId = user.BranchId,
                 IsSuperAdmin = user.IsSuperAdmin,
                 IsActive = user.IsActive,
-                Roles = request.RoleNames,
+                Roles = resolvedRoleNames,
                 CreatedAt = user.CreatedAt,
                 CreatedBy = user.CreatedBy
             }, cancellationToken);
 
             _logPublisher.PublishActivity(new ActivityLogEvent
             {
-                ActionType = 0,  // UserCreated
-                EntityType = 0,  // User
+                ActionType = 0,
+                EntityType = 0,
                 EntityId = user.Id,
                 Description = $"User {user.Email} was created",
                 NewValues = JsonSerializer.Serialize(new
@@ -162,7 +173,7 @@ public class CreateUserCommandHandler
                 IsSuccess = true
             });
 
-            return MapToUserResponse(user, new List<string>(request.RoleNames));
+            return MapToUserResponse(user, resolvedRoleNames);
         }
         catch (ConflictException)
         {
@@ -172,12 +183,16 @@ public class CreateUserCommandHandler
         {
             throw;
         }
+        catch (NotFoundException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logPublisher.PublishActivity(new ActivityLogEvent
             {
-                ActionType = 0,  // UserCreated
-                EntityType = 0,  // User
+                ActionType = 0,
+                EntityType = 0,
                 Description = $"Unexpected error creating user {request.Email}",
                 UserId = request.CreatedBy,
                 IsSuccess = false,

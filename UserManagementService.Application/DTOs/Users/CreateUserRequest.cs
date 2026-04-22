@@ -9,5 +9,5 @@ public class CreateUserRequest
     public Guid TenantId { get; set; }
     public Guid? BranchId { get; set; }
     public bool IsActive { get; set; } = true;
-    public List<string> RoleNames { get; set; } = new();
+    public List<string> RoleIds { get; set; } = new();
 }
