@@ -1,4 +1,4 @@
-﻿namespace UserManagementService.Application.DTOs.Users;
+namespace UserManagementService.Application.DTOs.Users;
 
 public class UpdateUserRequest
 {
@@ -8,5 +8,5 @@ public class UpdateUserRequest
     public string? LastName { get; set; }
     public bool? IsActive { get; set; }
     public Guid? BranchId { get; set; }
-    public List<string>? RoleNames { get; set; }
+    public List<string>? RoleIds { get; set; }
 }

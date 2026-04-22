@@ -1,4 +1,4 @@
-﻿namespace UserManagementService.Application.DTOs.Users;
+namespace UserManagementService.Application.DTOs.Users;
 
 public class CreateUserRequest
 {

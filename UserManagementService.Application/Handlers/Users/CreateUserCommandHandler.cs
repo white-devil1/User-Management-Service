@@ -19,6 +19,7 @@ public class CreateUserCommandHandler
     private readonly ILogPublisher _logPublisher;
     private readonly IEmailService _emailService;
     private readonly IPasswordGenerator _passwordGenerator;
+    private readonly IFileStorageService _fileStorage;
 
     public CreateUserCommandHandler(
         UserManager<ApplicationUser> userManager,
@@ -26,7 +27,8 @@ public class CreateUserCommandHandler
         IEventPublisher eventPublisher,
         ILogPublisher logPublisher,
         IEmailService emailService,
-        IPasswordGenerator passwordGenerator)
+        IPasswordGenerator passwordGenerator,
+        IFileStorageService fileStorage)
     {
         _userManager = userManager;
         _roleManager = roleManager;
@@ -34,6 +36,7 @@ public class CreateUserCommandHandler
         _logPublisher = logPublisher;
         _emailService = emailService;
         _passwordGenerator = passwordGenerator;
+        _fileStorage = fileStorage;
     }
 
     public async Task<UserResponse> Handle(
@@ -126,6 +129,22 @@ public class CreateUserCommandHandler
                 }
             }
 
+            // Save profile images if provided
+            if (request.ProfileImageBytes != null && request.ProfileImageExtension != null)
+            {
+                user.ProfileImagePath = await _fileStorage.SaveProfileImageAsync(
+                    request.ProfileImageBytes, user.Id, "big",
+                    request.ProfileImageExtension, cancellationToken);
+            }
+            if (request.ProfileThumbBytes != null && request.ProfileThumbExtension != null)
+            {
+                user.ProfileThumbPath = await _fileStorage.SaveProfileImageAsync(
+                    request.ProfileThumbBytes, user.Id, "thumb",
+                    request.ProfileThumbExtension, cancellationToken);
+            }
+            if (user.ProfileImagePath != null || user.ProfileThumbPath != null)
+                await _userManager.UpdateAsync(user);
+
             // Send welcome email with email as login credential
             var displayName = user.FirstName ?? user.UserName;
             await _emailService.SendWelcomeEmailAsync(
@@ -210,6 +229,8 @@ public class CreateUserCommandHandler
             UserName = user.UserName!,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            ProfileImagePath = user.ProfileImagePath,
+            ProfileThumbPath = user.ProfileThumbPath,
             TenantId = user.TenantId,
             BranchId = user.BranchId,
             IsSuperAdmin = user.IsSuperAdmin,

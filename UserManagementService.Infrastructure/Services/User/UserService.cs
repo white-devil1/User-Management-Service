@@ -174,6 +174,8 @@ public class UserService : IUserService
             UserName = user.UserName!,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            ProfileImagePath = user.ProfileImagePath,
+            ProfileThumbPath = user.ProfileThumbPath,
             TenantId = user.TenantId,
             BranchId = user.BranchId,
             IsSuperAdmin = user.IsSuperAdmin,
@@ -182,7 +184,11 @@ public class UserService : IUserService
             IsTemporaryPassword = user.IsTemporaryPassword,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt,
+            CreatedBy = user.CreatedBy,
             UpdatedAt = user.UpdatedAt,
+            UpdatedBy = user.UpdatedBy,
+            DeletedAt = user.DeletedAt,
+            DeletedBy = user.DeletedBy,
             Roles = roles
         };
     }

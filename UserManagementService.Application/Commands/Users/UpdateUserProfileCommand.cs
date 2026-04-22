@@ -3,19 +3,13 @@ using UserManagementService.Application.DTOs.Users;
 
 namespace UserManagementService.Application.Commands.Users;
 
-public class UpdateUserCommand : IRequest<UserResponse>
+public class UpdateUserProfileCommand : IRequest<UserResponse>
 {
-    public string Id { get; set; } = default!;
-    public string? Email { get; set; }
-    public string? UserName { get; set; }
+    public string UserId { get; set; } = default!;
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
-    public bool? IsActive { get; set; }
-    public Guid? BranchId { get; set; }
-    public List<string>? RoleIds { get; set; }
     public byte[]? ProfileImageBytes { get; set; }
     public string? ProfileImageExtension { get; set; }
     public byte[]? ProfileThumbBytes { get; set; }
     public string? ProfileThumbExtension { get; set; }
-    public string? UpdatedBy { get; set; }
 }

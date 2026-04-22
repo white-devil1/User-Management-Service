@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using System.Text.Json;
 using UserManagementService.Application.Commands.Users;
@@ -14,17 +14,23 @@ public class UpdateUserCommandHandler
     : IRequestHandler<UpdateUserCommand, UserResponse>
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly IEventPublisher _eventPublisher;
     private readonly ILogPublisher _logPublisher;
+    private readonly IFileStorageService _fileStorage;
 
     public UpdateUserCommandHandler(
         UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
         IEventPublisher eventPublisher,
-        ILogPublisher logPublisher)
+        ILogPublisher logPublisher,
+        IFileStorageService fileStorage)
     {
         _userManager = userManager;
+        _roleManager = roleManager;
         _eventPublisher = eventPublisher;
         _logPublisher = logPublisher;
+        _fileStorage = fileStorage;
     }
 
     public async Task<UserResponse> Handle(
@@ -37,8 +43,8 @@ public class UpdateUserCommandHandler
             {
                 _logPublisher.PublishActivity(new ActivityLogEvent
                 {
-                    ActionType = 1,  // UserUpdated
-                    EntityType = 0,  // User
+                    ActionType = 1,
+                    EntityType = 0,
                     EntityId = request.Id,
                     Description = $"Failed to update user - user not found",
                     UserId = request.UpdatedBy,
@@ -46,6 +52,20 @@ public class UpdateUserCommandHandler
                     FailureReason = "User not found"
                 });
                 throw new NotFoundException("User", request.Id);
+            }
+
+            // Resolve role IDs to names up-front (before any writes)
+            List<string>? resolvedRoleNames = null;
+            if (request.RoleIds != null)
+            {
+                resolvedRoleNames = new List<string>();
+                foreach (var roleId in request.RoleIds)
+                {
+                    var role = await _roleManager.FindByIdAsync(roleId);
+                    if (role == null)
+                        throw new NotFoundException($"Role with ID '{roleId}' was not found.");
+                    resolvedRoleNames.Add(role.Name!);
+                }
             }
 
             var oldValues = JsonSerializer.Serialize(new
@@ -73,8 +93,8 @@ public class UpdateUserCommandHandler
                 var errors = string.Join("; ", result.Errors.Select(e => e.Description));
                 _logPublisher.PublishActivity(new ActivityLogEvent
                 {
-                    ActionType = 1,  // UserUpdated
-                    EntityType = 0,  // User
+                    ActionType = 1,
+                    EntityType = 0,
                     EntityId = user.Id,
                     Description = $"Failed to update user {user.Email} - validation errors",
                     OldValues = oldValues,
@@ -86,7 +106,7 @@ public class UpdateUserCommandHandler
                     result.Errors.Select(e => e.Description).ToList());
             }
 
-            if (request.RoleNames != null)
+            if (resolvedRoleNames != null)
             {
                 var currentRoles = await _userManager.GetRolesAsync(user);
                 var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
@@ -95,8 +115,8 @@ public class UpdateUserCommandHandler
                     var errors = string.Join("; ", removeResult.Errors.Select(e => e.Description));
                     _logPublisher.PublishActivity(new ActivityLogEvent
                     {
-                        ActionType = 1,  // UserUpdated
-                        EntityType = 0,  // User
+                        ActionType = 1,
+                        EntityType = 0,
                         EntityId = user.Id,
                         Description = $"Failed to remove roles from user {user.Email}",
                         UserId = request.UpdatedBy,
@@ -106,24 +126,43 @@ public class UpdateUserCommandHandler
                     throw new ValidationException(
                         removeResult.Errors.Select(e => e.Description).ToList());
                 }
-                
-                var addResult = await _userManager.AddToRolesAsync(user, request.RoleNames);
-                if (!addResult.Succeeded)
+
+                if (resolvedRoleNames.Any())
                 {
-                    var errors = string.Join("; ", addResult.Errors.Select(e => e.Description));
-                    _logPublisher.PublishActivity(new ActivityLogEvent
+                    var addResult = await _userManager.AddToRolesAsync(user, resolvedRoleNames);
+                    if (!addResult.Succeeded)
                     {
-                        ActionType = 1,  // UserUpdated
-                        EntityType = 0,  // User
-                        EntityId = user.Id,
-                        Description = $"Failed to assign roles to user {user.Email}",
-                        UserId = request.UpdatedBy,
-                        IsSuccess = false,
-                        FailureReason = errors
-                    });
-                    throw new ValidationException(
-                        addResult.Errors.Select(e => e.Description).ToList());
+                        var errors = string.Join("; ", addResult.Errors.Select(e => e.Description));
+                        _logPublisher.PublishActivity(new ActivityLogEvent
+                        {
+                            ActionType = 1,
+                            EntityType = 0,
+                            EntityId = user.Id,
+                            Description = $"Failed to assign roles to user {user.Email}",
+                            UserId = request.UpdatedBy,
+                            IsSuccess = false,
+                            FailureReason = errors
+                        });
+                        throw new ValidationException(
+                            addResult.Errors.Select(e => e.Description).ToList());
+                    }
                 }
+            }
+
+            // Save profile images if provided
+            if (request.ProfileImageBytes != null && request.ProfileImageExtension != null)
+            {
+                user.ProfileImagePath = await _fileStorage.SaveProfileImageAsync(
+                    request.ProfileImageBytes, user.Id, "big",
+                    request.ProfileImageExtension, cancellationToken);
+                await _userManager.UpdateAsync(user);
+            }
+            if (request.ProfileThumbBytes != null && request.ProfileThumbExtension != null)
+            {
+                user.ProfileThumbPath = await _fileStorage.SaveProfileImageAsync(
+                    request.ProfileThumbBytes, user.Id, "thumb",
+                    request.ProfileThumbExtension, cancellationToken);
+                await _userManager.UpdateAsync(user);
             }
 
             var roles = await _userManager.GetRolesAsync(user);
@@ -146,8 +185,8 @@ public class UpdateUserCommandHandler
 
             _logPublisher.PublishActivity(new ActivityLogEvent
             {
-                ActionType = 1,  // UserUpdated
-                EntityType = 0,  // User
+                ActionType = 1,
+                EntityType = 0,
                 EntityId = user.Id,
                 Description = $"User {user.Email} was updated",
                 OldValues = oldValues,
@@ -181,8 +220,8 @@ public class UpdateUserCommandHandler
         {
             _logPublisher.PublishActivity(new ActivityLogEvent
             {
-                ActionType = 1,  // UserUpdated
-                EntityType = 0,  // User
+                ActionType = 1,
+                EntityType = 0,
                 EntityId = request.Id,
                 Description = $"Unexpected error updating user {request.Id}",
                 UserId = request.UpdatedBy,
@@ -201,6 +240,8 @@ public class UpdateUserCommandHandler
             UserName = user.UserName!,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            ProfileImagePath = user.ProfileImagePath,
+            ProfileThumbPath = user.ProfileThumbPath,
             TenantId = user.TenantId,
             BranchId = user.BranchId,
             IsSuperAdmin = user.IsSuperAdmin,
