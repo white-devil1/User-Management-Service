@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UserManagementService.Application.Commands.Users;
@@ -25,7 +25,7 @@ public class UsersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<UserListResponse>>> GetUsers(
         [FromQuery] string? search,
-        [FromQuery] string? status,  // Changed from List<string> to string
+        [FromQuery] string? status,
         [FromQuery] Guid? tenantId,
         [FromQuery] Guid? branchId,
         [FromQuery] string? roleId,
@@ -34,7 +34,6 @@ public class UsersController : ControllerBase
         [FromQuery] string sortBy = "createdAt",
         [FromQuery] string sortOrder = "desc")
     {
-        // Parse status: supports both comma-separated and multiple query params
         var statusList = new List<string>();
         if (!string.IsNullOrEmpty(status))
         {
@@ -42,7 +41,7 @@ public class UsersController : ControllerBase
                 .Select(s => s.Trim().ToLower())
                 .ToList();
         }
-        
+
         if (!IsSuperAdmin() && !string.IsNullOrEmpty(GetTenantIdStr()))
             tenantId = Guid.Parse(GetTenantIdStr()!);
         if (!IsSuperAdmin() && statusList.Any() && statusList.Contains("deleted"))
@@ -83,11 +82,35 @@ public class UsersController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<UserResponse>>> CreateUser(
-        [FromBody] CreateUserRequest request)
+        [FromForm] CreateUserRequest request,
+        IFormFile? profileImage,
+        IFormFile? profileThumbImage)
     {
         if (!IsSuperAdmin() && !string.IsNullOrEmpty(GetTenantIdStr()))
             request.TenantId = Guid.Parse(GetTenantIdStr()!);
+
+        byte[]? imageBytes = null;
+        string? imageExt = null;
+        byte[]? thumbBytes = null;
+        string? thumbExt = null;
+
+        if (profileImage != null && profileImage.Length > 0)
+        {
+            using var ms = new MemoryStream();
+            await profileImage.CopyToAsync(ms);
+            imageBytes = ms.ToArray();
+            imageExt = Path.GetExtension(profileImage.FileName).ToLowerInvariant();
+        }
+        if (profileThumbImage != null && profileThumbImage.Length > 0)
+        {
+            using var ms = new MemoryStream();
+            await profileThumbImage.CopyToAsync(ms);
+            thumbBytes = ms.ToArray();
+            thumbExt = Path.GetExtension(profileThumbImage.FileName).ToLowerInvariant();
+        }
+
         var command = new CreateUserCommand
         {
             Email = request.Email,
@@ -97,7 +120,11 @@ public class UsersController : ControllerBase
             TenantId = request.TenantId,
             BranchId = request.BranchId,
             IsActive = request.IsActive,
-            RoleNames = request.RoleNames,
+            RoleIds = request.RoleIds,
+            ProfileImageBytes = imageBytes,
+            ProfileImageExtension = imageExt,
+            ProfileThumbBytes = thumbBytes,
+            ProfileThumbExtension = thumbExt,
             CreatedBy = GetUserId()
         };
         var result = await _mediator.Send(command);
@@ -107,9 +134,33 @@ public class UsersController : ControllerBase
 
     [HttpPut("{id}")]
     [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<UserResponse>>> UpdateUser(
-        string id, [FromBody] UpdateUserRequest request)
+        string id,
+        [FromForm] UpdateUserRequest request,
+        IFormFile? profileImage,
+        IFormFile? profileThumbImage)
     {
+        byte[]? imageBytes = null;
+        string? imageExt = null;
+        byte[]? thumbBytes = null;
+        string? thumbExt = null;
+
+        if (profileImage != null && profileImage.Length > 0)
+        {
+            using var ms = new MemoryStream();
+            await profileImage.CopyToAsync(ms);
+            imageBytes = ms.ToArray();
+            imageExt = Path.GetExtension(profileImage.FileName).ToLowerInvariant();
+        }
+        if (profileThumbImage != null && profileThumbImage.Length > 0)
+        {
+            using var ms = new MemoryStream();
+            await profileThumbImage.CopyToAsync(ms);
+            thumbBytes = ms.ToArray();
+            thumbExt = Path.GetExtension(profileThumbImage.FileName).ToLowerInvariant();
+        }
+
         var command = new UpdateUserCommand
         {
             Id = id,
@@ -119,7 +170,11 @@ public class UsersController : ControllerBase
             LastName = request.LastName,
             IsActive = request.IsActive,
             BranchId = request.BranchId,
-            RoleNames = request.RoleNames,
+            RoleIds = request.RoleIds,
+            ProfileImageBytes = imageBytes,
+            ProfileImageExtension = imageExt,
+            ProfileThumbBytes = thumbBytes,
+            ProfileThumbExtension = thumbExt,
             UpdatedBy = GetUserId()
         };
         var result = await _mediator.Send(command);

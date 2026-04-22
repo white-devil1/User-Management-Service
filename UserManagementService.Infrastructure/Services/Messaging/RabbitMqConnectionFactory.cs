@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Polly;
+using Polly.Registry;
 using RabbitMQ.Client;
 
 namespace UserManagementService.Infrastructure.Services.Messaging;

@@ -20,6 +20,7 @@ using UserManagementService.Infrastructure.Services.Email;
 using UserManagementService.Infrastructure.Services.Messaging;
 using UserManagementService.Infrastructure.Services.Logging;
 using UserManagementService.Infrastructure.Services.Pages;
+using UserManagementService.Infrastructure.Services.FileStorage;
 using UserManagementService.Infrastructure.Services.Roles;
 using UserManagementService.Infrastructure.Services.Token;
 using UserManagementService.Infrastructure.Services.User;
@@ -201,6 +202,9 @@ public static class DependencyInjection
 
         // Role Services
         services.AddScoped<IRoleService, RoleService>();
+
+        // File Storage Service
+        services.AddScoped<IFileStorageService, FileStorageService>();
 
         return services;
     }

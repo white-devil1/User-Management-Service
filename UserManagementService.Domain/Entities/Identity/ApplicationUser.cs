@@ -12,6 +12,8 @@ public class ApplicationUser : IdentityUser
     // User Profile
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
+    public string? ProfileImagePath { get; set; }
+    public string? ProfileThumbPath { get; set; }
 
     // Admin Flags
     public bool IsSuperAdmin { get; set; } = false;
