@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Polly;
 using RabbitMQ.Client;
 
 namespace UserManagementService.Infrastructure.Services.Messaging;
@@ -9,14 +10,17 @@ public class RabbitMqConnectionFactory : IDisposable
     private IConnection? _connection;
     private readonly ConnectionFactory _factory;
     private readonly ILogger<RabbitMqConnectionFactory> _logger;
+    private readonly ResiliencePipeline _connectPipeline;
     private readonly object _lock = new();
     private bool _disposed;
 
     public RabbitMqConnectionFactory(
         IConfiguration configuration,
-        ILogger<RabbitMqConnectionFactory> logger)
+        ILogger<RabbitMqConnectionFactory> logger,
+        ResiliencePipelineProvider<string> pipelineProvider)
     {
         _logger = logger;
+        _connectPipeline = pipelineProvider.GetPipeline("rabbitmq-connect");
         _factory = new ConnectionFactory
         {
             HostName = configuration["RabbitMQ:Host"] ?? "localhost",
@@ -38,10 +42,10 @@ public class RabbitMqConnectionFactory : IDisposable
                 return _connection;
 
             _logger.LogInformation(
-                "RabbitMQ: creating persistent connection to {Host}",
-                _factory.HostName);
+                "RabbitMQ: creating persistent connection to {Host}", _factory.HostName);
 
-            _connection = _factory.CreateConnectionAsync().GetAwaiter().GetResult();
+            _connection = _connectPipeline.ExecuteAsync(async ct =>
+                await _factory.CreateConnectionAsync(ct)).GetAwaiter().GetResult();
 
             _logger.LogInformation("RabbitMQ: connection established successfully");
             return _connection;

@@ -1,8 +1,10 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using UserManagementService.Domain.Configuration;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.CircuitBreaker;
+using UserManagementService.Domain.Configuration;
 
 namespace UserManagementService.Infrastructure.Services.Email;
 
@@ -10,14 +12,18 @@ public class ResendEmailProvider : IEmailProvider
 {
     private readonly HttpClient _httpClient;
     private readonly EmailSettings _emailSettings;
+    private readonly ResiliencePipeline _pipeline;
     private readonly string _baseUrl = "https://api.resend.com/emails";
 
-    public ResendEmailProvider(HttpClient httpClient, IOptions<EmailSettings> emailSettings)
+    public ResendEmailProvider(
+        HttpClient httpClient,
+        IOptions<EmailSettings> emailSettings,
+        ResiliencePipelineProvider<string> pipelineProvider)
     {
         _httpClient = httpClient;
         _emailSettings = emailSettings.Value;
+        _pipeline = pipelineProvider.GetPipeline("resend");
 
-        // Configure HttpClient
         _httpClient.BaseAddress = new Uri("https://api.resend.com");
         _httpClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", _emailSettings.Resend.ApiKey);
@@ -35,36 +41,40 @@ public class ResendEmailProvider : IEmailProvider
     {
         try
         {
-            var requestBody = new
+            return await _pipeline.ExecuteAsync<bool>(async ct =>
             {
-                from = $"{_emailSettings.FromName} <{_emailSettings.FromEmail}>",
-                to = new[] { $"{toName} <{toEmail}>" },
-                subject,
-                html = htmlBody,
-                text = textBody
-            };
+                var requestBody = new
+                {
+                    from = $"{_emailSettings.FromName} <{_emailSettings.FromEmail}>",
+                    to = new[] { $"{toName} <{toEmail}>" },
+                    subject,
+                    html = htmlBody,
+                    text = textBody
+                };
 
-            var jsonContent = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var content = new StringContent(
+                    JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(_baseUrl, content, cancellationToken);
+                var response = await _httpClient.PostAsync(_baseUrl, content, ct);
 
-            if (response.IsSuccessStatusCode)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                Console.WriteLine($"✅ Email sent successfully: {responseContent}");
-                return true;
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                Console.WriteLine($"❌ Email failed: {response.StatusCode} - {errorContent}");
-                return false;
-            }
+                if (response.IsSuccessStatusCode)
+                    return true;
+
+                // Treat non-success HTTP as a failure so Polly can retry
+                var error = await response.Content.ReadAsStringAsync(ct);
+                throw new HttpRequestException(
+                    $"Resend API returned {(int)response.StatusCode}: {error}");
+
+            }, cancellationToken);
+        }
+        catch (BrokenCircuitException)
+        {
+            Console.WriteLine("⚡ Resend circuit is open — email skipped");
+            return false;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Email exception: {ex.Message}");
+            Console.WriteLine($"❌ Resend failed after retries: {ex.Message}");
             return false;
         }
     }

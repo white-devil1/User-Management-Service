@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
 using System.Text;
 using UserManagementService.Application.Services;
 using UserManagementService.Application.Services.Password;
@@ -76,6 +79,82 @@ public static class DependencyInjection
         });
 
         services.AddAuthorization();
+
+        // Resilience pipelines (Polly v8)
+        // "smtp" / "resend": CircuitBreaker → Retry → Timeout per attempt
+        // "rabbitmq-connect": Retry with exponential backoff
+        // "rabbitmq-publish": CircuitBreaker → Retry
+        services.AddResiliencePipeline("smtp", builder =>
+            builder
+                .AddCircuitBreaker(new CircuitBreakerStrategyOptions
+                {
+                    SamplingDuration = TimeSpan.FromSeconds(30),
+                    MinimumThroughput = 5,
+                    FailureRatio = 0.5,
+                    BreakDuration = TimeSpan.FromSeconds(60),
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>()
+                })
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = 3,
+                    Delay = TimeSpan.FromSeconds(1),
+                    BackoffType = DelayBackoffType.Exponential,
+                    UseJitter = true,
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>()
+                })
+                .AddTimeout(TimeSpan.FromSeconds(10)));
+
+        services.AddResiliencePipeline("resend", builder =>
+            builder
+                .AddCircuitBreaker(new CircuitBreakerStrategyOptions
+                {
+                    SamplingDuration = TimeSpan.FromSeconds(30),
+                    MinimumThroughput = 5,
+                    FailureRatio = 0.5,
+                    BreakDuration = TimeSpan.FromSeconds(60),
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>()
+                })
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = 3,
+                    Delay = TimeSpan.FromSeconds(1),
+                    BackoffType = DelayBackoffType.Exponential,
+                    UseJitter = true,
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>()
+                })
+                .AddTimeout(TimeSpan.FromSeconds(10)));
+
+        // Connection retry only — no circuit breaker so startup keeps retrying
+        services.AddResiliencePipeline("rabbitmq-connect", builder =>
+            builder
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = 5,
+                    Delay = TimeSpan.FromSeconds(1),
+                    BackoffType = DelayBackoffType.Exponential,
+                    UseJitter = false,
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>()
+                })
+                .AddTimeout(TimeSpan.FromSeconds(5)));
+
+        // Publish: circuit breaker opens after sustained failures to prevent pile-up
+        services.AddResiliencePipeline("rabbitmq-publish", builder =>
+            builder
+                .AddCircuitBreaker(new CircuitBreakerStrategyOptions
+                {
+                    SamplingDuration = TimeSpan.FromSeconds(30),
+                    MinimumThroughput = 10,
+                    FailureRatio = 0.5,
+                    BreakDuration = TimeSpan.FromSeconds(120),
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>()
+                })
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = 2,
+                    Delay = TimeSpan.FromSeconds(1),
+                    BackoffType = DelayBackoffType.Linear,
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>()
+                }));
 
         // RabbitMQ — persistent connection (Singleton) + publisher (Scoped)
         // Singleton: one connection shared for the entire app lifetime
