@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.CircuitBreaker;
+using Polly.Registry;
 using UserManagementService.Domain.Configuration;
 
 namespace UserManagementService.Infrastructure.Services.Email;

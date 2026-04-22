@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.CircuitBreaker;
+using Polly.Registry;
 using RabbitMQ.Client;
 using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;

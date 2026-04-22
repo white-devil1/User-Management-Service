@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.CircuitBreaker;
+using Polly.Registry;
 using UserManagementService.Domain.Configuration;
 
 namespace UserManagementService.Infrastructure.Services.Email;
