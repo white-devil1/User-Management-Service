@@ -106,6 +106,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi(); // Built-in OpenAPI endpoint at /openapi/v1.json
 }
 
+// Ensure wwwroot exists before UseStaticFiles so WebRootPath is never null
+var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(wwwrootPath);
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseCors("AllowAll");

@@ -1,7 +1,8 @@
-using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MimeKit;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Registry;
@@ -35,47 +36,48 @@ public class SmtpEmailProvider : IEmailProvider
         string? textBody = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("📧 [SMTP] Sending email to {ToEmail} - Subject: {Subject}", toEmail, subject);
+        _logger.LogInformation(
+            "[SMTP] Sending email to {ToEmail} - Subject: {Subject}", toEmail, subject);
 
         try
         {
             return await _pipeline.ExecuteAsync<bool>(async ct =>
             {
-                using var message = new MailMessage
-                {
-                    From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
-                    Subject = subject,
-                    Body = htmlBody,
-                    IsBodyHtml = true
-                };
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress(_emailSettings.FromName, _emailSettings.FromEmail));
+                message.To.Add(new MailboxAddress(toName, toEmail));
+                message.Subject = subject;
 
-                message.To.Add(new MailAddress(toEmail, toName));
-
+                var bodyBuilder = new BodyBuilder { HtmlBody = htmlBody };
                 if (!string.IsNullOrEmpty(textBody))
-                    message.AlternateViews.Add(
-                        AlternateView.CreateAlternateViewFromString(textBody, null, "text/plain"));
+                    bodyBuilder.TextBody = textBody;
+                message.Body = bodyBuilder.ToMessageBody();
 
-                using var client = new SmtpClient(_smtpSettings.Host, _smtpSettings.Port)
-                {
-                    Credentials = new NetworkCredential(_smtpSettings.Username, _smtpSettings.Password),
-                    EnableSsl = _smtpSettings.EnableSsl
-                };
+                using var client = new SmtpClient();
+                await client.ConnectAsync(
+                    _smtpSettings.Host, _smtpSettings.Port,
+                    SecureSocketOptions.StartTls, ct);
+                await client.AuthenticateAsync(
+                    _smtpSettings.Username, _smtpSettings.Password, ct);
+                await client.SendAsync(message, ct);
+                await client.DisconnectAsync(quit: true, ct);
 
-                _logger.LogInformation("📧 [SMTP] Connecting to {Host}:{Port}", _smtpSettings.Host, _smtpSettings.Port);
-                await client.SendMailAsync(message, ct);
-                _logger.LogInformation("✅ [SMTP] Email sent successfully to {ToEmail}", toEmail);
+                _logger.LogInformation(
+                    "[SMTP] Email sent successfully to {ToEmail}", toEmail);
                 return true;
 
             }, cancellationToken);
         }
         catch (BrokenCircuitException)
         {
-            _logger.LogWarning("⚡ [SMTP] Circuit is open — skipping email to {ToEmail}", toEmail);
+            _logger.LogWarning(
+                "[SMTP] Circuit is open — skipping email to {ToEmail}", toEmail);
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ [SMTP] Failed to send email to {ToEmail} after retries", toEmail);
+            _logger.LogError(ex,
+                "[SMTP] Failed to send email to {ToEmail} after retries", toEmail);
             return false;
         }
     }

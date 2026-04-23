@@ -2,8 +2,6 @@
 
 public class EmailSettings
 {
-    public string Provider { get; set; } = "Resend"; // Resend or Smtp
-    public ResendSettings Resend { get; set; } = new();
     public SmtpSettings Smtp { get; set; } = new();
     public string FromEmail { get; set; } = default!;
     public string FromName { get; set; } = default!;
@@ -11,11 +9,6 @@ public class EmailSettings
     public string CompanyUrl { get; set; } = default!;
     public string SupportEmail { get; set; } = default!;
     public OtpSettings OtpSettings { get; set; } = new();
-}
-
-public class ResendSettings
-{
-    public string ApiKey { get; set; } = default!;
 }
 
 public class SmtpSettings

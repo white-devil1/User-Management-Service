@@ -12,11 +12,13 @@ obj/
 packages/
 node_modules/
 lib/
-
+.claude/
+API_Documentation.html
+trustino-herschel-*
 # Logs
 *.log
 logs/
-
+wwwroot/
 # Environment
 .env
 .env.local

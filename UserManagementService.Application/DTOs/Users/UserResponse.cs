@@ -7,6 +7,7 @@ public class UserResponse
     public string UserName { get; set; } = default!;
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
+    public string FullName => $"{FirstName} {LastName}".Trim();
     public string? ProfileImagePath { get; set; }
     public string? ProfileThumbPath { get; set; }
     public Guid TenantId { get; set; }

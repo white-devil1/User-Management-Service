@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UserManagementService.Application.DTOs.Email;
 using UserManagementService.Application.Services;
@@ -28,7 +28,7 @@ public class EmailService : IEmailService
 
     public async Task<bool> SendEmailAsync(EmailDto emailDto, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("📧 Sending email to {ToEmail} - Subject: {Subject}",
+        _logger.LogInformation("Sending email to {ToEmail} - Subject: {Subject}",
             emailDto.ToEmail, emailDto.Subject);
 
         try
@@ -39,23 +39,18 @@ public class EmailService : IEmailService
                 emailDto.Subject,
                 emailDto.HtmlBody,
                 emailDto.TextBody,
-                cancellationToken
-            );
+                cancellationToken);
 
             if (result)
-            {
-                _logger.LogInformation("✅ Email sent successfully to {ToEmail}", emailDto.ToEmail);
-            }
+                _logger.LogInformation("Email sent successfully to {ToEmail}", emailDto.ToEmail);
             else
-            {
-                _logger.LogError("❌ Email failed to send to {ToEmail}", emailDto.ToEmail);
-            }
+                _logger.LogError("Email failed to send to {ToEmail}", emailDto.ToEmail);
 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Email exception for {ToEmail}: {Error}", emailDto.ToEmail, ex.Message);
+            _logger.LogError(ex, "Email exception for {ToEmail}: {Error}", emailDto.ToEmail, ex.Message);
             throw;
         }
     }
@@ -67,19 +62,14 @@ public class EmailService : IEmailService
         string purpose,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("📧 Sending OTP email to {ToEmail} - Purpose: {Purpose}", toEmail, purpose);
-        _logger.LogInformation("🔢 OTP (DEBUG): {OTP}", otp);
+        _logger.LogInformation("Sending OTP email to {ToEmail} - Purpose: {Purpose}", toEmail, purpose);
 
         var subject = purpose == "ForgotPassword"
             ? "Password Reset OTP"
             : "Verification Code";
 
         var htmlBody = _templateService.GenerateOtpEmailTemplate(
-            toName,
-            otp,
-            _emailSettings.CompanyName,
-            _emailSettings.CompanyUrl
-        );
+            toName, otp, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
 
         return await SendEmailAsync(new EmailDto
         {
@@ -97,23 +87,16 @@ public class EmailService : IEmailService
         string tempPassword,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("📧 Sending admin reset password email to {ToEmail}", toEmail);
-
-        var subject = "Your Password Has Been Reset";
+        _logger.LogInformation("Sending admin reset password email to {ToEmail}", toEmail);
 
         var htmlBody = _templateService.GenerateAdminResetPasswordTemplate(
-            toName,
-            username,
-            tempPassword,
-            _emailSettings.CompanyName,
-            _emailSettings.CompanyUrl
-        );
+            toName, username, tempPassword, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
 
         return await SendEmailAsync(new EmailDto
         {
             ToEmail = toEmail,
             ToName = toName,
-            Subject = subject,
+            Subject = "Your Password Has Been Reset",
             HtmlBody = htmlBody
         }, cancellationToken);
     }
@@ -125,23 +108,16 @@ public class EmailService : IEmailService
         string tempPassword,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("📧 Sending welcome email to {ToEmail}", toEmail);
-
-        var subject = "Welcome! Your Account is Ready";
+        _logger.LogInformation("Sending welcome email to {ToEmail}", toEmail);
 
         var htmlBody = _templateService.GenerateWelcomeEmailTemplate(
-            toName,
-            username,
-            tempPassword,
-            _emailSettings.CompanyName,
-            _emailSettings.CompanyUrl
-        );
+            toName, username, tempPassword, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
 
         return await SendEmailAsync(new EmailDto
         {
             ToEmail = toEmail,
             ToName = toName,
-            Subject = subject,
+            Subject = "Welcome! Your Account is Ready",
             HtmlBody = htmlBody
         }, cancellationToken);
     }
