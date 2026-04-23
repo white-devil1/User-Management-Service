@@ -64,7 +64,7 @@ public class RoleService : IRoleService
                 result.Errors.Select(e => e.Description)));
 
 
-        return MapToResponse(role, new List<string>());
+        return MapToResponse(role, new RolePermissionsGrouped());
     }
 
     public async Task<RoleResponse> UpdateRoleAsync(
@@ -93,7 +93,7 @@ public class RoleService : IRoleService
 
         await _roleManager.UpdateAsync(role);
 
-        var permissions = await GetRolePermissionCodes(roleId, ct);
+        var permissions = await GetRolePermissionsGrouped(roleId, ct);
         return MapToResponse(role, permissions);
     }
 
@@ -104,6 +104,12 @@ public class RoleService : IRoleService
     {
         var role = await GetAndGuardRole(
             roleId, callerIsSuperAdmin, callerTenantId, ct);
+
+        var isAssigned = await _context.UserRoles
+            .AnyAsync(ur => ur.RoleId == roleId, ct);
+        if (isAssigned)
+            throw new ConflictException(
+                "Cannot delete this role because it is assigned to one or more users. Remove the role from all users first.");
 
         role.IsDeleted = true;
         role.DeletedAt = DateTime.UtcNow;
@@ -120,7 +126,7 @@ public class RoleService : IRoleService
     {
         var role = await GetAndGuardRole(
             roleId, callerIsSuperAdmin, callerTenantId, ct);
-        var permissions = await GetRolePermissionCodes(roleId, ct);
+        var permissions = await GetRolePermissionsGrouped(roleId, ct);
         return MapToResponse(role, permissions);
     }
 
@@ -158,7 +164,7 @@ public class RoleService : IRoleService
         var responses = new List<RoleResponse>();
         foreach (var role in roles)
         {
-            var perms = await GetRolePermissionCodes(role.Id, ct);
+            var perms = await GetRolePermissionsGrouped(role.Id, ct);
             responses.Add(MapToResponse(role, perms));
         }
 
@@ -247,7 +253,7 @@ public class RoleService : IRoleService
         await _context.RolePermissions.AddRangeAsync(newAssignments, ct);
         await _context.SaveChangesAsync(ct);
 
-        var permCodes = await GetRolePermissionCodes(roleId, ct);
+        var permCodes = await GetRolePermissionsGrouped(roleId, ct);
         return MapToResponse(role, permCodes);
     }
 
@@ -271,18 +277,57 @@ public class RoleService : IRoleService
         return role;
     }
 
-    private async Task<List<string>> GetRolePermissionCodes(
+    private async Task<RolePermissionsGrouped> GetRolePermissionsGrouped(
         string roleId, CancellationToken ct)
     {
-        return await _context.RolePermissions
+        var assignedPermissions = await _context.RolePermissions
             .Where(rp => rp.RoleId == roleId && !rp.IsDeleted)
-            .Join(_context.Permissions,
-                rp => rp.PermissionId, p => p.Id, (rp, p) => p.PermissionCode)
+            .Join(_context.Permissions
+                    .Include(p => p.App)
+                    .Include(p => p.Page)
+                    .Include(p => p.Action),
+                rp => rp.PermissionId, p => p.Id, (rp, p) => p)
             .ToListAsync(ct);
+
+        var grouped = new RolePermissionsGrouped();
+
+        foreach (var appGroup in assignedPermissions
+            .GroupBy(p => new { p.AppId, AppName = p.App?.Name ?? "Unknown" })
+            .OrderBy(g => g.Key.AppName))
+        {
+            var appDto = new RoleAppPermissionsDto
+            {
+                AppId = appGroup.Key.AppId,
+                AppName = appGroup.Key.AppName
+            };
+
+            foreach (var pageGroup in appGroup
+                .GroupBy(p => new { p.PageId, PageName = p.Page?.Name ?? "Unknown" })
+                .OrderBy(g => g.Key.PageName))
+            {
+                appDto.Pages.Add(new RolePagePermissionsDto
+                {
+                    PageId = pageGroup.Key.PageId,
+                    PageName = pageGroup.Key.PageName,
+                    Permissions = pageGroup
+                        .OrderBy(p => p.Action?.Name)
+                        .Select(p => new RolePermissionActionDto
+                        {
+                            Id = p.Id,
+                            ActionName = p.Action?.Name ?? "Unknown"
+                        })
+                        .ToList()
+                });
+            }
+
+            grouped.Apps.Add(appDto);
+        }
+
+        return grouped;
     }
 
     private static RoleResponse MapToResponse(
-        ApplicationRole role, List<string> permissions)
+        ApplicationRole role, RolePermissionsGrouped permissions)
     {
         return new RoleResponse
         {

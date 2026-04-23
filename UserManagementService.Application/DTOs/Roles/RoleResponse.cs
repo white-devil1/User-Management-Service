@@ -14,5 +14,5 @@ public class RoleResponse
     public string? CreatedBy { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? UpdatedBy { get; set; }
-    public List<string> Permissions { get; set; } = new();
+    public RolePermissionsGrouped Permissions { get; set; } = new();
 }
