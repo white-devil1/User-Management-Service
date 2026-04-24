@@ -119,6 +119,19 @@ public class RolesController : ControllerBase
             result, "Role deleted successfully"));
     }
 
+    [HttpGet("available-permissions")]
+    public async Task<ActionResult<ApiResponse<RolePermissionsGrouped>>> GetAvailablePermissions()
+    {
+        var command = new GetAvailablePermissionsCommand
+        {
+            CallerUserId = GetUserId(),
+            CallerIsSuperAdmin = IsSuperAdmin()
+        };
+        var result = await _mediator.Send(command);
+        return Ok(ApiResponse<RolePermissionsGrouped>.Ok(
+            result, "Available permissions retrieved successfully"));
+    }
+
     [HttpPost("{id}/permissions")]
     [Authorize(Policy = "SuperAdminOrTenantAdmin")]
     public async Task<ActionResult<ApiResponse<RoleResponse>>> AssignPermissions(

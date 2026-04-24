@@ -34,4 +34,8 @@ public interface IRoleService
         string roleId, List<Guid> permissionIds,
         string callerUserId, bool callerIsSuperAdmin,
         Guid callerTenantId, CancellationToken ct = default);
+
+    Task<RolePermissionsGrouped> GetAvailablePermissionsAsync(
+        string callerUserId, bool callerIsSuperAdmin,
+        CancellationToken ct = default);
 }

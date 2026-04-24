@@ -257,6 +257,78 @@ public class RoleService : IRoleService
         return MapToResponse(role, permCodes);
     }
 
+    public async Task<RolePermissionsGrouped> GetAvailablePermissionsAsync(
+        string callerUserId, bool callerIsSuperAdmin,
+        CancellationToken ct = default)
+    {
+        List<Domain.Entities.RBAC.Permission> permissions;
+
+        if (callerIsSuperAdmin)
+        {
+            permissions = await _context.Permissions
+                .Include(p => p.App)
+                .Include(p => p.Page)
+                .Include(p => p.Action)
+                .Where(p => p.IsEnabled && !p.IsDeleted)
+                .ToListAsync(ct);
+        }
+        else
+        {
+            var callerRoleIds = await _context.UserRoles
+                .Where(ur => ur.UserId == callerUserId)
+                .Select(ur => ur.RoleId)
+                .ToListAsync(ct);
+
+            var assignedPermissionIds = await _context.RolePermissions
+                .Where(rp => callerRoleIds.Contains(rp.RoleId) && !rp.IsDeleted)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync(ct);
+
+            permissions = await _context.Permissions
+                .Include(p => p.App)
+                .Include(p => p.Page)
+                .Include(p => p.Action)
+                .Where(p => assignedPermissionIds.Contains(p.Id) && p.IsEnabled && !p.IsDeleted)
+                .ToListAsync(ct);
+        }
+
+        var grouped = new RolePermissionsGrouped();
+
+        foreach (var appGroup in permissions
+            .GroupBy(p => new { p.AppId, AppName = p.App?.Name ?? "Unknown" })
+            .OrderBy(g => g.Key.AppName))
+        {
+            var appDto = new RoleAppPermissionsDto
+            {
+                AppId = appGroup.Key.AppId,
+                AppName = appGroup.Key.AppName
+            };
+
+            foreach (var pageGroup in appGroup
+                .GroupBy(p => new { p.PageId, PageName = p.Page?.Name ?? "Unknown" })
+                .OrderBy(g => g.Key.PageName))
+            {
+                appDto.Pages.Add(new RolePagePermissionsDto
+                {
+                    PageId = pageGroup.Key.PageId,
+                    PageName = pageGroup.Key.PageName,
+                    Permissions = pageGroup
+                        .OrderBy(p => p.Action?.Name)
+                        .Select(p => new RolePermissionActionDto
+                        {
+                            Id = p.Id,
+                            ActionName = p.Action?.Name ?? "Unknown"
+                        })
+                        .ToList()
+                });
+            }
+
+            grouped.Apps.Add(appDto);
+        }
+
+        return grouped;
+    }
+
     // ── Private helpers ──
 
     private async Task<ApplicationRole> GetAndGuardRole(
