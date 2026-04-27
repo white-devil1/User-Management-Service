@@ -51,14 +51,14 @@ public class AdminResetPasswordCommandHandler
         user.LastPasswordChangedAt = DateTime.UtcNow;
         user.PasswordChangedCount += 1;
         user.UpdatedAt = DateTime.UtcNow;
-        user.DeletedBy = request.ResetByUserId;
+        user.UpdatedBy = request.ResetByUserId;
         await _userManager.UpdateAsync(user);
 
-        var userName = user.FirstName ?? user.UserName;
+        var displayName = user.FirstName ?? user.UserName ?? "User";
         await _emailService.SendAdminResetPasswordEmailAsync(
             user.Email!,
-            userName ?? user.UserName ?? "User",
-            user.UserName!,
+            displayName,
+            user.Email!,
             tempPassword,
             cancellationToken);
 

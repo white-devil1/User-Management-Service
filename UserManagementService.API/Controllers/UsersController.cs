@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using UserManagementService.Application.Commands.Auth;
 using UserManagementService.Application.Commands.Users;
 using UserManagementService.Application.Common;
 using UserManagementService.Application.DTOs.Users;
@@ -226,5 +227,21 @@ public class UsersController : ControllerBase
         var result = await _mediator.Send(command);
         return Ok(ApiResponse<List<RoleDto>>.Ok(
             result, "Available roles retrieved"));
+    }
+
+    [HttpPost("{id}/reset-password")]
+    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    public async Task<ActionResult<ApiResponse<bool>>> ResetUserPassword(string id)
+    {
+        var command = new AdminResetPasswordCommand
+        {
+            UserId = id,
+            NewPassword = null,          // always system-generated
+            ForceChangeOnLogin = true,
+            ResetByUserId = GetUserId()
+        };
+        await _mediator.Send(command);
+        return Ok(ApiResponse<bool>.Ok(
+            true, "Password reset successfully. Credentials have been sent to the user's email."));
     }
 }
