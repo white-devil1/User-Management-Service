@@ -10,10 +10,12 @@ namespace UserManagementService.Infrastructure.Services.Pages;
 public class PageService : IPageService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IUserDisplayNameResolver _resolver;
 
-    public PageService(ApplicationDbContext context)
+    public PageService(ApplicationDbContext context, IUserDisplayNameResolver resolver)
     {
         _context = context;
+        _resolver = resolver;
     }
 
     public async Task<PageListResponse> GetPagesAsync(
@@ -112,6 +114,8 @@ public class PageService : IPageService
         string createdBy,
         CancellationToken cancellationToken = default)
     {
+        var createdByName = await _resolver.ResolveAsync(createdBy, cancellationToken);
+
         // ✅ Validate App exists
         var app = await _context.Apps.FindAsync(request.AppId);
         if (app == null)
@@ -136,7 +140,7 @@ public class PageService : IPageService
             Description = request.Description,
             DisplayOrder = request.DisplayOrder,
             IsActive = true,
-            CreatedBy = createdBy,
+            CreatedBy = createdByName,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -152,6 +156,8 @@ public class PageService : IPageService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var page = await _context.Pages
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
@@ -175,7 +181,7 @@ public class PageService : IPageService
         page.Description = request.Description;
         page.DisplayOrder = request.DisplayOrder;
         page.IsActive = request.IsActive;
-        page.UpdatedBy = updatedBy;
+        page.UpdatedBy = updatedByName;
         page.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -185,6 +191,8 @@ public class PageService : IPageService
 
     public async Task<bool> DeletePageAsync(Guid id, string deletedBy, CancellationToken cancellationToken = default)
     {
+        var deletedByName = await _resolver.ResolveAsync(deletedBy, cancellationToken);
+
         var page = await _context.Pages
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
@@ -196,7 +204,7 @@ public class PageService : IPageService
         // ✅ Soft Delete
         page.IsDeleted = true;
         page.DeletedAt = DateTime.UtcNow;
-        page.DeletedBy = deletedBy;
+        page.DeletedBy = deletedByName;
         page.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -210,6 +218,8 @@ public class PageService : IPageService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var page = await _context.Pages
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
@@ -219,7 +229,7 @@ public class PageService : IPageService
         }
 
         page.IsActive = isActive;
-        page.UpdatedBy = updatedBy;
+        page.UpdatedBy = updatedByName;
         page.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);

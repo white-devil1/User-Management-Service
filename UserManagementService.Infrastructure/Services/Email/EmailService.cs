@@ -57,7 +57,7 @@ public class EmailService : IEmailService
 
     public async Task<bool> SendOtpEmailAsync(
         string toEmail,
-        string toName,
+        string displayName,
         string otp,
         string purpose,
         CancellationToken cancellationToken = default)
@@ -69,12 +69,12 @@ public class EmailService : IEmailService
             : "Verification Code";
 
         var htmlBody = _templateService.GenerateOtpEmailTemplate(
-            toName, otp, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
+            displayName, otp, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
 
         return await SendEmailAsync(new EmailDto
         {
             ToEmail = toEmail,
-            ToName = toName,
+            ToName = displayName,
             Subject = subject,
             HtmlBody = htmlBody
         }, cancellationToken);
@@ -82,20 +82,20 @@ public class EmailService : IEmailService
 
     public async Task<bool> SendAdminResetPasswordEmailAsync(
         string toEmail,
-        string toName,
-        string username,
+        string displayName,
+        string loginEmail,
         string tempPassword,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Sending admin reset password email to {ToEmail}", toEmail);
 
         var htmlBody = _templateService.GenerateAdminResetPasswordTemplate(
-            toName, username, tempPassword, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
+            displayName, loginEmail, tempPassword, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
 
         return await SendEmailAsync(new EmailDto
         {
             ToEmail = toEmail,
-            ToName = toName,
+            ToName = displayName,
             Subject = "Your Password Has Been Reset",
             HtmlBody = htmlBody
         }, cancellationToken);
@@ -103,20 +103,20 @@ public class EmailService : IEmailService
 
     public async Task<bool> SendWelcomeEmailAsync(
         string toEmail,
-        string toName,
-        string username,
+        string displayName,
+        string loginEmail,
         string tempPassword,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Sending welcome email to {ToEmail}", toEmail);
 
         var htmlBody = _templateService.GenerateWelcomeEmailTemplate(
-            toName, username, tempPassword, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
+            displayName, loginEmail, tempPassword, _emailSettings.CompanyName, _emailSettings.CompanyUrl);
 
         return await SendEmailAsync(new EmailDto
         {
             ToEmail = toEmail,
-            ToName = toName,
+            ToName = displayName,
             Subject = "Welcome! Your Account is Ready",
             HtmlBody = htmlBody
         }, cancellationToken);

@@ -23,6 +23,7 @@ using UserManagementService.Infrastructure.Services.Pages;
 using UserManagementService.Infrastructure.Services.FileStorage;
 using UserManagementService.Infrastructure.Services.Roles;
 using UserManagementService.Infrastructure.Services.Token;
+using UserManagementService.Infrastructure.Services.Identity;
 using UserManagementService.Infrastructure.Services.User;
 
 namespace UserManagementService.Infrastructure;
@@ -181,6 +182,9 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IRefreshTokenStorageService, RefreshTokenStorageService>();
+
+        // User Display Name Resolver
+        services.AddScoped<IUserDisplayNameResolver, UserDisplayNameResolver>();
 
         // User Services
         services.AddScoped<IUserService, UserService>();

@@ -15,14 +15,18 @@ public class UpdateUserProfileCommandHandler
     private readonly IFileStorageService _fileStorage;
     private readonly ILogPublisher _logPublisher;
 
+    private readonly IUserDisplayNameResolver _resolver;
+
     public UpdateUserProfileCommandHandler(
         UserManager<ApplicationUser> userManager,
         IFileStorageService fileStorage,
-        ILogPublisher logPublisher)
+        ILogPublisher logPublisher,
+        IUserDisplayNameResolver resolver)
     {
         _userManager = userManager;
         _fileStorage = fileStorage;
         _logPublisher = logPublisher;
+        _resolver = resolver;
     }
 
     public async Task<UserResponse> Handle(
@@ -35,7 +39,7 @@ public class UpdateUserProfileCommandHandler
         if (request.FirstName != null) user.FirstName = request.FirstName;
         if (request.LastName != null) user.LastName = request.LastName;
         user.UpdatedAt = DateTime.UtcNow;
-        user.UpdatedBy = request.UserId;
+        user.UpdatedBy = await _resolver.ResolveAsync(request.UserId, cancellationToken);
 
         if (request.ProfileImageBytes != null && request.ProfileImageExtension != null)
         {

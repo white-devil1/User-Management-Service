@@ -21,6 +21,8 @@ public class CreateUserCommandHandler
     private readonly IPasswordGenerator _passwordGenerator;
     private readonly IFileStorageService _fileStorage;
 
+    private readonly IUserDisplayNameResolver _resolver;
+
     public CreateUserCommandHandler(
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager,
@@ -28,7 +30,8 @@ public class CreateUserCommandHandler
         ILogPublisher logPublisher,
         IEmailService emailService,
         IPasswordGenerator passwordGenerator,
-        IFileStorageService fileStorage)
+        IFileStorageService fileStorage,
+        IUserDisplayNameResolver resolver)
     {
         _userManager = userManager;
         _roleManager = roleManager;
@@ -37,6 +40,7 @@ public class CreateUserCommandHandler
         _emailService = emailService;
         _passwordGenerator = passwordGenerator;
         _fileStorage = fileStorage;
+        _resolver = resolver;
     }
 
     public async Task<UserResponse> Handle(
@@ -70,6 +74,7 @@ public class CreateUserCommandHandler
                 resolvedRoleNames.Add(role.Name!);
             }
 
+            var createdByName = await _resolver.ResolveAsync(request.CreatedBy, cancellationToken);
             var tempPassword = _passwordGenerator.GenerateTempPassword();
 
             var user = new ApplicationUser
@@ -86,9 +91,9 @@ public class CreateUserCommandHandler
                 MustChangePassword = true,
                 TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(24),
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = request.CreatedBy,
+                CreatedBy = createdByName,
                 UpdatedAt = DateTime.UtcNow,
-                UpdatedBy = request.CreatedBy
+                UpdatedBy = createdByName
             };
 
             var result = await _userManager.CreateAsync(user, tempPassword);

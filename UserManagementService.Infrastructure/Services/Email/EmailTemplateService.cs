@@ -4,7 +4,7 @@ namespace UserManagementService.Infrastructure.Services.Email;
 
 public class EmailTemplateService : IEmailTemplateService
 {
-    public string GenerateOtpEmailTemplate(string userName, string otp, string companyName, string companyUrl)
+    public string GenerateOtpEmailTemplate(string displayName, string otp, string companyName, string companyUrl)
     {
         return $@"
 <!DOCTYPE html>
@@ -29,7 +29,7 @@ public class EmailTemplateService : IEmailTemplateService
           <!-- Body -->
           <tr>
             <td style=""padding: 40px;"">
-              <p style=""color: #333333; font-size: 16px; line-height: 1.6;"">Hello {userName},</p>
+              <p style=""color: #333333; font-size: 16px; line-height: 1.6;"">Hello {displayName},</p>
               
               <p style=""color: #333333; font-size: 16px; line-height: 1.6;"">
                 We received a request to reset your password. Use the OTP (One-Time Password) below to reset your password:
@@ -74,7 +74,7 @@ public class EmailTemplateService : IEmailTemplateService
 </html>";
     }
 
-    public string GenerateAdminResetPasswordTemplate(string userName, string email, string tempPassword, string companyName, string companyUrl)
+    public string GenerateAdminResetPasswordTemplate(string displayName, string loginEmail, string tempPassword, string companyName, string companyUrl)
     {
         return $@"
 <!DOCTYPE html>
@@ -101,7 +101,7 @@ public class EmailTemplateService : IEmailTemplateService
           <!-- Body -->
           <tr>
             <td style=""padding: 40px 40px 32px;"">
-              <p style=""color: #374151; font-size: 16px; line-height: 1.7; margin: 0 0 16px 0;"">Hello {userName},</p>
+              <p style=""color: #374151; font-size: 16px; line-height: 1.7; margin: 0 0 16px 0;"">Hello {displayName},</p>
 
               <p style=""color: #6b7280; font-size: 15px; line-height: 1.7; margin: 0 0 32px 0;"">
                 A new temporary password has been issued for your account. Use the credentials below to sign in. You will be prompted to set a new password immediately after logging in.
@@ -121,7 +121,7 @@ public class EmailTemplateService : IEmailTemplateService
                       </tr>
                       <tr>
                         <td style=""background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px;"">
-                          <p style=""color: #1e293b; font-size: 16px; font-weight: 600; margin: 0; word-break: break-all;"">{email}</p>
+                          <p style=""color: #1e293b; font-size: 16px; font-weight: 600; margin: 0; word-break: break-all;"">{loginEmail}</p>
                         </td>
                       </tr>
                     </table>
@@ -182,7 +182,7 @@ public class EmailTemplateService : IEmailTemplateService
 </html>";
     }
 
-    public string GenerateWelcomeEmailTemplate(string userName, string username, string tempPassword, string companyName, string companyUrl)
+    public string GenerateWelcomeEmailTemplate(string displayName, string loginEmail, string tempPassword, string companyName, string companyUrl)
     {
         return $@"
 <!DOCTYPE html>
@@ -207,7 +207,7 @@ public class EmailTemplateService : IEmailTemplateService
           <!-- Body -->
           <tr>
             <td style=""padding: 40px;"">
-              <p style=""color: #333333; font-size: 16px; line-height: 1.6;"">Hello {userName},</p>
+              <p style=""color: #333333; font-size: 16px; line-height: 1.6;"">Hello {displayName},</p>
               
               <p style=""color: #333333; font-size: 16px; line-height: 1.6;"">
                 Welcome aboard! Your account has been successfully created. Below are your login credentials to get started:
@@ -219,7 +219,7 @@ public class EmailTemplateService : IEmailTemplateService
                   <td align=""center"" style=""background-color: #D1FAE5; padding: 30px; border-radius: 8px; border: 2px solid #10B981;"">
                     <!-- Email -->
                     <p style=""color: #065F46; font-size: 14px; margin: 0 0 10px 0;"">Email</p>
-                    <p style=""color: #10B981; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;"">{username}</p>
+                    <p style=""color: #10B981; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;"">{loginEmail}</p>
                     
                     <!-- Temporary Password -->
                     <p style=""color: #065F46; font-size: 14px; margin: 0 0 10px 0; border-top: 1px dashed #10B981; padding-top: 20px;"">Temporary Password</p>

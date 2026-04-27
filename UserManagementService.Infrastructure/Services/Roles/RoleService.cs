@@ -13,13 +13,16 @@ public class RoleService : IRoleService
 {
     private readonly ApplicationDbContext _context;
     private readonly RoleManager<ApplicationRole> _roleManager;
+    private readonly IUserDisplayNameResolver _resolver;
 
     public RoleService(
         ApplicationDbContext context,
-        RoleManager<ApplicationRole> roleManager)
+        RoleManager<ApplicationRole> roleManager,
+        IUserDisplayNameResolver resolver)
     {
         _context = context;
         _roleManager = roleManager;
+        _resolver = resolver;
     }
 
     public async Task<RoleResponse> CreateRoleAsync(
@@ -28,6 +31,8 @@ public class RoleService : IRoleService
         Guid callerTenantId, Guid? callerBranchId,
         CancellationToken ct = default)
     {
+        var callerName = await _resolver.ResolveAsync(callerUserId, ct);
+
         // Determine scope from caller identity
         var scope = callerIsSuperAdmin ? RoleScope.Global
             : callerBranchId.HasValue ? RoleScope.Branch
@@ -52,8 +57,8 @@ public class RoleService : IRoleService
             BranchId = callerBranchId,
             Scope = scope,
             IsDefault = false,
-            CreatedBy = callerUserId,
-            UpdatedBy = callerUserId,
+            CreatedBy = callerName,
+            UpdatedBy = callerName,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -72,6 +77,8 @@ public class RoleService : IRoleService
         string callerUserId, bool callerIsSuperAdmin,
         Guid callerTenantId, CancellationToken ct = default)
     {
+        var callerName = await _resolver.ResolveAsync(callerUserId, ct);
+
         var role = await GetAndGuardRole(
             roleId, callerIsSuperAdmin, callerTenantId, ct);
 
@@ -88,7 +95,7 @@ public class RoleService : IRoleService
         role.Name = name;
         role.NormalizedName = name.ToUpper();
         role.Description = description;
-        role.UpdatedBy = callerUserId;
+        role.UpdatedBy = callerName;
         role.UpdatedAt = DateTime.UtcNow;
 
         await _roleManager.UpdateAsync(role);
@@ -102,6 +109,8 @@ public class RoleService : IRoleService
         bool callerIsSuperAdmin, Guid callerTenantId,
         CancellationToken ct = default)
     {
+        var callerName = await _resolver.ResolveAsync(callerUserId, ct);
+
         var role = await GetAndGuardRole(
             roleId, callerIsSuperAdmin, callerTenantId, ct);
 
@@ -113,7 +122,7 @@ public class RoleService : IRoleService
 
         role.IsDeleted = true;
         role.DeletedAt = DateTime.UtcNow;
-        role.DeletedBy = callerUserId;
+        role.DeletedBy = callerName;
         role.UpdatedAt = DateTime.UtcNow;
 
         await _roleManager.UpdateAsync(role);
@@ -183,6 +192,8 @@ public class RoleService : IRoleService
         string callerUserId, bool callerIsSuperAdmin,
         Guid callerTenantId, CancellationToken ct = default)
     {
+        var callerName = await _resolver.ResolveAsync(callerUserId, ct);
+
         var role = await GetAndGuardRole(
             roleId, callerIsSuperAdmin, callerTenantId, ct);
 
@@ -233,7 +244,7 @@ public class RoleService : IRoleService
         {
             rp.IsDeleted = true;
             rp.DeletedAt = DateTime.UtcNow;
-            rp.DeletedBy = callerUserId;
+            rp.DeletedBy = callerName;
         }
 
         // Add new assignments
@@ -243,9 +254,9 @@ public class RoleService : IRoleService
             RoleId = roleId,
             PermissionId = pid,
             AssignedAt = DateTime.UtcNow,
-            AssignedBy = callerUserId,
-            CreatedBy = callerUserId,
-            UpdatedBy = callerUserId,
+            AssignedBy = callerName,
+            CreatedBy = callerName,
+            UpdatedBy = callerName,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         }).ToList();

@@ -19,18 +19,22 @@ public class UpdateUserCommandHandler
     private readonly ILogPublisher _logPublisher;
     private readonly IFileStorageService _fileStorage;
 
+    private readonly IUserDisplayNameResolver _resolver;
+
     public UpdateUserCommandHandler(
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager,
         IEventPublisher eventPublisher,
         ILogPublisher logPublisher,
-        IFileStorageService fileStorage)
+        IFileStorageService fileStorage,
+        IUserDisplayNameResolver resolver)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _eventPublisher = eventPublisher;
         _logPublisher = logPublisher;
         _fileStorage = fileStorage;
+        _resolver = resolver;
     }
 
     public async Task<UserResponse> Handle(
@@ -85,7 +89,7 @@ public class UpdateUserCommandHandler
             if (request.IsActive.HasValue) user.IsActive = request.IsActive.Value;
             if (request.BranchId.HasValue) user.BranchId = request.BranchId.Value;
             user.UpdatedAt = DateTime.UtcNow;
-            user.UpdatedBy = request.UpdatedBy;
+            user.UpdatedBy = await _resolver.ResolveAsync(request.UpdatedBy, cancellationToken);
 
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)

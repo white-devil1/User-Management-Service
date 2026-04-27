@@ -10,10 +10,12 @@ namespace UserManagementService.Infrastructure.Services.AppPermissions;
 public class AppPermissionService : IAppPermissionService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IUserDisplayNameResolver _resolver;
 
-    public AppPermissionService(ApplicationDbContext context)
+    public AppPermissionService(ApplicationDbContext context, IUserDisplayNameResolver resolver)
     {
         _context = context;
+        _resolver = resolver;
     }
 
     public async Task<AppPermissionListResponse> GetPermissionsAsync(
@@ -114,6 +116,8 @@ public class AppPermissionService : IAppPermissionService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var permission = await _context.Permissions
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
@@ -123,7 +127,7 @@ public class AppPermissionService : IAppPermissionService
         }
 
         permission.IsEnabled = isEnabled;
-        permission.UpdatedBy = updatedBy;
+        permission.UpdatedBy = updatedByName;
         permission.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -137,6 +141,8 @@ public class AppPermissionService : IAppPermissionService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var permission = await _context.Permissions
             .Include(p => p.Action).ThenInclude(a => a!.Page).ThenInclude(p => p!.App)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
@@ -147,7 +153,7 @@ public class AppPermissionService : IAppPermissionService
         }
 
         permission.IsEnabled = isEnabled;
-        permission.UpdatedBy = updatedBy;
+        permission.UpdatedBy = updatedByName;
         permission.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -294,6 +300,7 @@ public class AppPermissionService : IAppPermissionService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
         var results = new List<TogglePermissionResponseDto>();
         var now = DateTime.UtcNow;
 
@@ -309,7 +316,7 @@ public class AppPermissionService : IAppPermissionService
             }
 
             permission.IsEnabled = item.IsEnabled;
-            permission.UpdatedBy = updatedBy;
+            permission.UpdatedBy = updatedByName;
             permission.UpdatedAt = now;
 
             results.Add(new TogglePermissionResponseDto

@@ -13,10 +13,12 @@ namespace UserManagementService.Infrastructure.Services.Apps;
 public class AppService : IAppService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IUserDisplayNameResolver _resolver;
 
-    public AppService(ApplicationDbContext context)
+    public AppService(ApplicationDbContext context, IUserDisplayNameResolver resolver)
     {
         _context = context;
+        _resolver = resolver;
     }
 
     public async Task<AppListResponse> GetAppsAsync(
@@ -105,6 +107,8 @@ public class AppService : IAppService
 
     public async Task<AppDto> CreateAppAsync(CreateAppRequest request, string createdBy, CancellationToken cancellationToken = default)
     {
+        var createdByName = await _resolver.ResolveAsync(createdBy, cancellationToken);
+
         // ✅ Auto-generate App Code from Name
         var code = GenerateAppCode(request.Name);
 
@@ -122,7 +126,7 @@ public class AppService : IAppService
             Icon = request.Icon,
             DisplayOrder = request.DisplayOrder,
             IsActive = true,
-            CreatedBy = createdBy,
+            CreatedBy = createdByName,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -134,6 +138,8 @@ public class AppService : IAppService
 
     public async Task<AppDto> UpdateAppAsync(Guid id, UpdateAppRequest request, string updatedBy, CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var app = await _context.Apps
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -158,7 +164,7 @@ public class AppService : IAppService
         app.Icon = request.Icon;
         app.DisplayOrder = request.DisplayOrder;
         app.IsActive = request.IsActive;
-        app.UpdatedBy = updatedBy;
+        app.UpdatedBy = updatedByName;
         app.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -168,6 +174,8 @@ public class AppService : IAppService
 
     public async Task<bool> DeleteAppAsync(Guid id, string deletedBy, CancellationToken cancellationToken = default)
     {
+        var deletedByName = await _resolver.ResolveAsync(deletedBy, cancellationToken);
+
         var app = await _context.Apps
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -179,7 +187,7 @@ public class AppService : IAppService
         // ✅ Soft Delete
         app.IsDeleted = true;
         app.DeletedAt = DateTime.UtcNow;
-        app.DeletedBy = deletedBy;
+        app.DeletedBy = deletedByName;
         app.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -189,6 +197,8 @@ public class AppService : IAppService
 
     public async Task<AppDto> ToggleAppStatusAsync(Guid id, bool isActive, string updatedBy, CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var app = await _context.Apps
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -198,7 +208,7 @@ public class AppService : IAppService
         }
 
         app.IsActive = isActive;
-        app.UpdatedBy = updatedBy;
+        app.UpdatedBy = updatedByName;
         app.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);

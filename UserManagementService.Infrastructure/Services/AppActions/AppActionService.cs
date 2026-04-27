@@ -10,10 +10,12 @@ namespace UserManagementService.Infrastructure.Services.AppActions;
 public class AppActionService : IAppActionService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IUserDisplayNameResolver _resolver;
 
-    public AppActionService(ApplicationDbContext context)
+    public AppActionService(ApplicationDbContext context, IUserDisplayNameResolver resolver)
     {
         _context = context;
+        _resolver = resolver;
     }
 
     public async Task<AppActionListResponse> GetActionsAsync(
@@ -122,6 +124,8 @@ public class AppActionService : IAppActionService
         string createdBy,
         CancellationToken cancellationToken = default)
     {
+        var createdByName = await _resolver.ResolveAsync(createdBy, cancellationToken);
+
         // ✅ Validate Page exists
         var page = await _context.Pages
             .Include(p => p.App)  // ← Need App for permission code generation
@@ -151,7 +155,7 @@ public class AppActionService : IAppActionService
             Description = request.Description,
             DisplayOrder = request.DisplayOrder,
             IsActive = true,
-            CreatedBy = createdBy,
+            CreatedBy = createdByName,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -175,7 +179,7 @@ public class AppActionService : IAppActionService
             PermissionCode = permissionCode,
             Name = permissionName,
             IsEnabled = false,  // ⚠️ Default: INACTIVE (Super Admin must activate)
-            CreatedBy = createdBy,
+            CreatedBy = createdByName,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -194,6 +198,8 @@ public class AppActionService : IAppActionService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var action = await _context.Actions
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -226,7 +232,7 @@ public class AppActionService : IAppActionService
                 {
                     permission.PermissionCode = $"{page.App.Code}_{page.Code}_{action.Code}";
                     permission.Name = $"{page.App.Name} - {page.Name} - {action.Name}";
-                    permission.UpdatedBy = updatedBy;
+                    permission.UpdatedBy = updatedByName;
                     permission.UpdatedAt = DateTime.UtcNow;
                 }
             }
@@ -237,7 +243,7 @@ public class AppActionService : IAppActionService
         action.Type = request.Type;
         action.DisplayOrder = request.DisplayOrder;
         action.IsActive = request.IsActive;
-        action.UpdatedBy = updatedBy;
+        action.UpdatedBy = updatedByName;
         action.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -247,6 +253,8 @@ public class AppActionService : IAppActionService
 
     public async Task<bool> DeleteActionAsync(Guid id, string deletedBy, CancellationToken cancellationToken = default)
     {
+        var deletedByName = await _resolver.ResolveAsync(deletedBy, cancellationToken);
+
         var action = await _context.Actions
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -258,7 +266,7 @@ public class AppActionService : IAppActionService
         // ✅ Soft Delete Action
         action.IsDeleted = true;
         action.DeletedAt = DateTime.UtcNow;
-        action.DeletedBy = deletedBy;
+        action.DeletedBy = deletedByName;
         action.UpdatedAt = DateTime.UtcNow;
 
         // ✅ Also soft-delete the associated Permission
@@ -269,7 +277,7 @@ public class AppActionService : IAppActionService
         {
             permission.IsDeleted = true;
             permission.DeletedAt = DateTime.UtcNow;
-            permission.DeletedBy = deletedBy;
+            permission.DeletedBy = deletedByName;
             permission.UpdatedAt = DateTime.UtcNow;
         }
 
@@ -284,6 +292,8 @@ public class AppActionService : IAppActionService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
+        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
+
         var action = await _context.Actions
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -293,7 +303,7 @@ public class AppActionService : IAppActionService
         }
 
         action.IsActive = isActive;
-        action.UpdatedBy = updatedBy;
+        action.UpdatedBy = updatedByName;
         action.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
