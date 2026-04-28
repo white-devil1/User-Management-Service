@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using UserManagementService.Application.DTOs.Users;
 using UserManagementService.Application.Services;
@@ -11,11 +11,16 @@ public class UserService : IUserService
 {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IUserDisplayNameResolver _resolver;
 
-    public UserService(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+    public UserService(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        IUserDisplayNameResolver resolver)
     {
         _context = context;
         _userManager = userManager;
+        _resolver = resolver;
     }
 
     public async Task<UserListResponse> GetUsersAsync(
@@ -82,11 +87,15 @@ public class UserService : IUserService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        // Batch-resolve all unique audit UUIDs in one pass
+        var allIds = users.SelectMany(u => new[] { u.CreatedBy, u.UpdatedBy, u.DeletedBy });
+        var names = await BuildNameCacheAsync(allIds, cancellationToken);
+
         var userResponses = new List<UserResponse>();
         foreach (var user in users)
         {
             var roles = await _userManager.GetRolesAsync(user);
-            userResponses.Add(MapToUserResponse(user, roles.ToList()));
+            userResponses.Add(MapToUserResponse(user, roles.ToList(), names));
         }
 
         return new UserListResponse
@@ -106,8 +115,9 @@ public class UserService : IUserService
 
         if (user == null) return null;
 
+        var names = await BuildNameCacheAsync(new[] { user.CreatedBy, user.UpdatedBy, user.DeletedBy }, cancellationToken);
         var roles = await _userManager.GetRolesAsync(user);
-        return MapToUserResponse(user, roles.ToList());
+        return MapToUserResponse(user, roles.ToList(), names);
     }
 
     public async Task<List<RoleDto>> GetAvailableRolesAsync(
@@ -134,6 +144,41 @@ public class UserService : IUserService
             IsDefault = r.IsDefault
         }).ToListAsync(cancellationToken);
     }
+
+    private async Task<Dictionary<string, string>> BuildNameCacheAsync(
+        IEnumerable<string?> userIds, CancellationToken ct)
+    {
+        var cache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in userIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct()!)
+            cache[id!] = await _resolver.ResolveAsync(id, ct);
+        return cache;
+    }
+
+    private static UserResponse MapToUserResponse(
+        ApplicationUser user, List<string> roles, Dictionary<string, string> names) => new()
+    {
+        Id = user.Id,
+        Email = user.Email!,
+        UserName = user.UserName!,
+        FirstName = user.FirstName,
+        LastName = user.LastName,
+        ProfileImagePath = user.ProfileImagePath,
+        ProfileThumbPath = user.ProfileThumbPath,
+        TenantId = user.TenantId,
+        BranchId = user.BranchId,
+        IsSuperAdmin = user.IsSuperAdmin,
+        IsActive = user.IsActive,
+        IsDeleted = user.IsDeleted,
+        IsTemporaryPassword = user.IsTemporaryPassword,
+        LastLoginAt = user.LastLoginAt,
+        CreatedAt = user.CreatedAt,
+        CreatedBy = user.CreatedBy != null && names.TryGetValue(user.CreatedBy, out var cb) ? cb : null,
+        UpdatedAt = user.UpdatedAt,
+        UpdatedBy = user.UpdatedBy != null && names.TryGetValue(user.UpdatedBy, out var ub) ? ub : null,
+        DeletedAt = user.DeletedAt,
+        DeletedBy = user.DeletedBy != null && names.TryGetValue(user.DeletedBy, out var db) ? db : null,
+        Roles = roles
+    };
 
     private IQueryable<ApplicationUser> ApplySortingAscending(IQueryable<ApplicationUser> query, string sortBy)
     {
@@ -162,34 +207,6 @@ public class UserService : IUserService
             "updatedat" => query.OrderByDescending(u => u.UpdatedAt),
             "lastloginat" => query.OrderByDescending(u => u.LastLoginAt),
             _ => query.OrderByDescending(u => u.CreatedAt)
-        };
-    }
-
-    private UserResponse MapToUserResponse(ApplicationUser user, List<string> roles)
-    {
-        return new UserResponse
-        {
-            Id = user.Id,
-            Email = user.Email!,
-            UserName = user.UserName!,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            ProfileImagePath = user.ProfileImagePath,
-            ProfileThumbPath = user.ProfileThumbPath,
-            TenantId = user.TenantId,
-            BranchId = user.BranchId,
-            IsSuperAdmin = user.IsSuperAdmin,
-            IsActive = user.IsActive,
-            IsDeleted = user.IsDeleted,
-            IsTemporaryPassword = user.IsTemporaryPassword,
-            LastLoginAt = user.LastLoginAt,
-            CreatedAt = user.CreatedAt,
-            CreatedBy = user.CreatedBy,
-            UpdatedAt = user.UpdatedAt,
-            UpdatedBy = user.UpdatedBy,
-            DeletedAt = user.DeletedAt,
-            DeletedBy = user.DeletedBy,
-            Roles = roles
         };
     }
 }

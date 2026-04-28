@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using UserManagementService.Application.Common.Exceptions;
 using UserManagementService.Application.DTOs.AppActions;
 using UserManagementService.Application.Services;
@@ -19,8 +19,8 @@ public class AppActionService : IAppActionService
     }
 
     public async Task<AppActionListResponse> GetActionsAsync(
-        Guid? appId,    // ✅ NEW: Optional filter by App
-        Guid? pageId,   // ✅ CHANGED: Nullable Guid - optional
+        Guid? appId,
+        Guid? pageId,
         string? search,
         bool? isActive,
         bool includeDeleted,
@@ -30,48 +30,33 @@ public class AppActionService : IAppActionService
         string sortOrder,
         CancellationToken cancellationToken = default)
     {
-        // ✅ Start with ALL actions, include Page + App for navigation
         var query = _context.Actions
             .Include(a => a.Page).ThenInclude(p => p!.App)
             .AsQueryable();
 
-        // ✅ Apply appId filter ONLY if provided
         if (appId.HasValue)
-        {
             query = query.Where(a => a.Page != null && a.Page.AppId == appId.Value);
-        }
 
-        // ✅ Apply pageId filter ONLY if provided
         if (pageId.HasValue)
-        {
             query = query.Where(a => a.PageId == pageId.Value);
-        }
 
-        // ✅ Apply Filters
         if (!string.IsNullOrWhiteSpace(search))
         {
             var trimmedSearch = search.Trim();
-            query = query.Where(a => 
-                EF.Functions.ILike(a.Name, $"%{trimmedSearch}%") || 
-                EF.Functions.ILike(a.Code, $"%{trimmedSearch}%") || 
+            query = query.Where(a =>
+                EF.Functions.ILike(a.Name, $"%{trimmedSearch}%") ||
+                EF.Functions.ILike(a.Code, $"%{trimmedSearch}%") ||
                 (a.Description != null && EF.Functions.ILike(a.Description, $"%{trimmedSearch}%")));
         }
 
         if (isActive.HasValue)
-        {
             query = query.Where(a => a.IsActive == isActive.Value);
-        }
 
-        // ✅ Include deleted only if requested (Super Admin)
         if (!includeDeleted)
-        {
             query = query.Where(a => !a.IsDeleted);
-        }
 
-        // ✅ Get total count before pagination
         var totalCount = await query.CountAsync(cancellationToken);
 
-        // ✅ Apply Sorting
         query = sortBy.ToLower() switch
         {
             "name" => sortOrder.ToLower() == "asc"
@@ -88,13 +73,14 @@ public class AppActionService : IAppActionService
                 : query.OrderByDescending(a => a.DisplayOrder)
         };
 
-        // ✅ Apply Pagination
         var actions = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var actionDtos = actions.Select(MapToDto).ToList();
+        var allIds = actions.SelectMany(a => new[] { a.CreatedBy, a.UpdatedBy, a.DeletedBy });
+        var names = await BuildNameCacheAsync(allIds, cancellationToken);
+        var actionDtos = actions.Select(a => MapToDto(a, names)).ToList();
 
         return new AppActionListResponse
         {
@@ -105,6 +91,7 @@ public class AppActionService : IAppActionService
             TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
         };
     }
+
     public async Task<AppActionDto> GetActionByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var action = await _context.Actions
@@ -112,11 +99,10 @@ public class AppActionService : IAppActionService
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (action == null)
-        {
             throw new NotFoundException("Action", id);
-        }
 
-        return MapToDto(action);
+        var names = await BuildNameCacheAsync(new[] { action.CreatedBy, action.UpdatedBy, action.DeletedBy }, cancellationToken);
+        return MapToDto(action, names);
     }
 
     public async Task<AppActionDto> CreateActionAsync(
@@ -124,28 +110,18 @@ public class AppActionService : IAppActionService
         string createdBy,
         CancellationToken cancellationToken = default)
     {
-        var createdByName = await _resolver.ResolveAsync(createdBy, cancellationToken);
-
-        // ✅ Validate Page exists
         var page = await _context.Pages
-            .Include(p => p.App)  // ← Need App for permission code generation
+            .Include(p => p.App)
             .FirstOrDefaultAsync(p => p.Id == request.PageId, cancellationToken);
 
         if (page == null)
-        {
             throw new NotFoundException("Page", request.PageId);
-        }
 
-        // ✅ Auto-generate Action Code from Name (SAME pattern as App/Page)
         var code = GenerateActionCode(request.Name);
 
-        // ✅ Check if Code already exists within this Page
         if (await _context.Actions.AnyAsync(a => a.PageId == request.PageId && a.Code == code, cancellationToken))
-        {
             throw new ConflictException($"An action with code '{code}' already exists within this page.");
-        }
 
-        // ✅ Create Action
         var action = new AppAction
         {
             PageId = request.PageId,
@@ -155,18 +131,15 @@ public class AppActionService : IAppActionService
             Description = request.Description,
             DisplayOrder = request.DisplayOrder,
             IsActive = true,
-            CreatedBy = createdByName,
+            CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow
         };
 
         _context.Actions.Add(action);
 
-        // ✅ CRITICAL: AUTO-GENERATE PERMISSION
-        // Format: {AppCode}_{PageCode}_{ActionCode}
         if (page.App == null)
-        {
             throw new NotFoundException($"App not found for page {page.Id}");
-        }
+
         var permissionCode = $"{page.App.Code}_{page.Code}_{action.Code}";
         var permissionName = $"{page.App.Name} - {page.Name} - {action.Name}";
 
@@ -178,18 +151,17 @@ public class AppActionService : IAppActionService
             ActionId = action.Id,
             PermissionCode = permissionCode,
             Name = permissionName,
-            IsEnabled = false,  // ⚠️ Default: INACTIVE (Super Admin must activate)
-            CreatedBy = createdByName,
+            IsEnabled = false,
+            CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         await _context.Permissions.AddAsync(permission);
-
-        // ✅ Save both Action and Permission in same transaction
         await _context.SaveChangesAsync(cancellationToken);
 
-        return MapToDto(action);
+        var names = await BuildNameCacheAsync(new[] { action.CreatedBy, action.UpdatedBy }, cancellationToken);
+        return MapToDto(action, names);
     }
 
     public async Task<AppActionDto> UpdateActionAsync(
@@ -198,42 +170,34 @@ public class AppActionService : IAppActionService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
-        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
-
         var action = await _context.Actions
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (action == null)
-        {
             throw new NotFoundException("Action", id);
-        }
 
-        // ✅ If Name changed, regenerate Code and update Permission
         if (action.Name != request.Name)
         {
             var newCode = GenerateActionCode(request.Name);
             if (await _context.Actions.AnyAsync(a => a.PageId == action.PageId && a.Code == newCode && a.Id != id, cancellationToken))
-            {
                 throw new ConflictException($"An action with code '{newCode}' already exists within this page.");
-            }
             action.Code = newCode;
 
-            // ✅ Update Permission Code and Name
             var page = await _context.Pages
                 .Include(p => p.App)
                 .FirstOrDefaultAsync(p => p.Id == action.PageId, cancellationToken);
 
             if (page != null && page.App != null)
             {
-                var permission = await _context.Permissions
+                var perm = await _context.Permissions
                     .FirstOrDefaultAsync(p => p.ActionId == action.Id, cancellationToken);
 
-                if (permission != null)
+                if (perm != null)
                 {
-                    permission.PermissionCode = $"{page.App.Code}_{page.Code}_{action.Code}";
-                    permission.Name = $"{page.App.Name} - {page.Name} - {action.Name}";
-                    permission.UpdatedBy = updatedByName;
-                    permission.UpdatedAt = DateTime.UtcNow;
+                    perm.PermissionCode = $"{page.App.Code}_{page.Code}_{action.Code}";
+                    perm.Name = $"{page.App.Name} - {page.Name} - {action.Name}";
+                    perm.UpdatedBy = updatedBy;
+                    perm.UpdatedAt = DateTime.UtcNow;
                 }
             }
         }
@@ -243,33 +207,28 @@ public class AppActionService : IAppActionService
         action.Type = request.Type;
         action.DisplayOrder = request.DisplayOrder;
         action.IsActive = request.IsActive;
-        action.UpdatedBy = updatedByName;
+        action.UpdatedBy = updatedBy;
         action.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return MapToDto(action);
+        var names = await BuildNameCacheAsync(new[] { action.CreatedBy, action.UpdatedBy }, cancellationToken);
+        return MapToDto(action, names);
     }
 
     public async Task<bool> DeleteActionAsync(Guid id, string deletedBy, CancellationToken cancellationToken = default)
     {
-        var deletedByName = await _resolver.ResolveAsync(deletedBy, cancellationToken);
-
         var action = await _context.Actions
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (action == null)
-        {
             throw new NotFoundException("Action", id);
-        }
 
-        // ✅ Soft Delete Action
         action.IsDeleted = true;
         action.DeletedAt = DateTime.UtcNow;
-        action.DeletedBy = deletedByName;
+        action.DeletedBy = deletedBy;
         action.UpdatedAt = DateTime.UtcNow;
 
-        // ✅ Also soft-delete the associated Permission
         var permission = await _context.Permissions
             .FirstOrDefaultAsync(p => p.ActionId == id, cancellationToken);
 
@@ -277,12 +236,11 @@ public class AppActionService : IAppActionService
         {
             permission.IsDeleted = true;
             permission.DeletedAt = DateTime.UtcNow;
-            permission.DeletedBy = deletedByName;
+            permission.DeletedBy = deletedBy;
             permission.UpdatedAt = DateTime.UtcNow;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
-
         return true;
     }
 
@@ -292,52 +250,53 @@ public class AppActionService : IAppActionService
         string updatedBy,
         CancellationToken cancellationToken = default)
     {
-        var updatedByName = await _resolver.ResolveAsync(updatedBy, cancellationToken);
-
         var action = await _context.Actions
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (action == null)
-        {
             throw new NotFoundException("Action", id);
-        }
 
         action.IsActive = isActive;
-        action.UpdatedBy = updatedByName;
+        action.UpdatedBy = updatedBy;
         action.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return MapToDto(action);
+        var names = await BuildNameCacheAsync(new[] { action.CreatedBy, action.UpdatedBy }, cancellationToken);
+        return MapToDto(action, names);
     }
 
-    // ✅ Helper: Map Entity to DTO
-    private static AppActionDto MapToDto(AppAction action)
+    private async Task<Dictionary<string, string>> BuildNameCacheAsync(
+        IEnumerable<string?> userIds, CancellationToken ct)
     {
-        return new AppActionDto
-        {
-            Id = action.Id,
-            PageId = action.PageId,
-            PageName = action.Page?.Name,
-            AppId = action.Page?.AppId,
-            AppName = action.Page?.App?.Name,
-            Name = action.Name,
-            Code = action.Code,
-            Type = action.Type,
-            Description = action.Description,
-            DisplayOrder = action.DisplayOrder,
-            IsActive = action.IsActive,
-            CreatedAt = action.CreatedAt,
-            CreatedBy = action.CreatedBy,
-            UpdatedAt = action.UpdatedAt,
-            UpdatedBy = action.UpdatedBy,
-            IsDeleted = action.IsDeleted,
-            DeletedAt = action.DeletedAt,
-            DeletedBy = action.DeletedBy
-        };
+        var cache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in userIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct()!)
+            cache[id!] = await _resolver.ResolveAsync(id, ct);
+        return cache;
     }
 
-    // ✅ Helper: Generate Action Code from Name (SAME pattern as App/Page)
+    private static AppActionDto MapToDto(AppAction action, Dictionary<string, string> names) => new()
+    {
+        Id = action.Id,
+        PageId = action.PageId,
+        PageName = action.Page?.Name,
+        AppId = action.Page?.AppId,
+        AppName = action.Page?.App?.Name,
+        Name = action.Name,
+        Code = action.Code,
+        Type = action.Type,
+        Description = action.Description,
+        DisplayOrder = action.DisplayOrder,
+        IsActive = action.IsActive,
+        CreatedAt = action.CreatedAt,
+        CreatedBy = action.CreatedBy != null && names.TryGetValue(action.CreatedBy, out var cb) ? cb : null,
+        UpdatedAt = action.UpdatedAt,
+        UpdatedBy = action.UpdatedBy != null && names.TryGetValue(action.UpdatedBy, out var ub) ? ub : null,
+        IsDeleted = action.IsDeleted,
+        DeletedAt = action.DeletedAt,
+        DeletedBy = action.DeletedBy != null && names.TryGetValue(action.DeletedBy, out var db) ? db : null
+    };
+
     private static string GenerateActionCode(string actionName)
     {
         var words = actionName

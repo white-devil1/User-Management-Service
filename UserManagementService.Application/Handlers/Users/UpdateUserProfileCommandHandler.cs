@@ -14,7 +14,6 @@ public class UpdateUserProfileCommandHandler
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IFileStorageService _fileStorage;
     private readonly ILogPublisher _logPublisher;
-
     private readonly IUserDisplayNameResolver _resolver;
 
     public UpdateUserProfileCommandHandler(
@@ -39,7 +38,7 @@ public class UpdateUserProfileCommandHandler
         if (request.FirstName != null) user.FirstName = request.FirstName;
         if (request.LastName != null) user.LastName = request.LastName;
         user.UpdatedAt = DateTime.UtcNow;
-        user.UpdatedBy = await _resolver.ResolveAsync(request.UserId, cancellationToken);
+        user.UpdatedBy = request.UserId;
 
         if (request.ProfileImageBytes != null && request.ProfileImageExtension != null)
         {
@@ -56,11 +55,7 @@ public class UpdateUserProfileCommandHandler
 
         var result = await _userManager.UpdateAsync(user);
         if (!result.Succeeded)
-        {
-            var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-            throw new ValidationException(
-                result.Errors.Select(e => e.Description).ToList());
-        }
+            throw new ValidationException(result.Errors.Select(e => e.Description).ToList());
 
         _logPublisher.PublishActivity(new Events.ActivityLogEvent
         {
@@ -75,31 +70,34 @@ public class UpdateUserProfileCommandHandler
             IsSuccess = true
         });
 
+        var createdByName = await _resolver.ResolveAsync(user.CreatedBy, cancellationToken);
+        var updatedByName = await _resolver.ResolveAsync(user.UpdatedBy, cancellationToken);
         var roles = await _userManager.GetRolesAsync(user);
-        return MapToUserResponse(user, roles.ToList());
+        return MapToUserResponse(user, roles.ToList(), createdByName, updatedByName);
     }
 
     private static UserResponse MapToUserResponse(
-        ApplicationUser user, List<string> roles) => new()
-        {
-            Id = user.Id,
-            Email = user.Email!,
-            UserName = user.UserName!,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            ProfileImagePath = user.ProfileImagePath,
-            ProfileThumbPath = user.ProfileThumbPath,
-            TenantId = user.TenantId,
-            BranchId = user.BranchId,
-            IsSuperAdmin = user.IsSuperAdmin,
-            IsActive = user.IsActive,
-            IsDeleted = user.IsDeleted,
-            IsTemporaryPassword = user.IsTemporaryPassword,
-            LastLoginAt = user.LastLoginAt,
-            CreatedAt = user.CreatedAt,
-            CreatedBy = user.CreatedBy,
-            UpdatedAt = user.UpdatedAt,
-            UpdatedBy = user.UpdatedBy,
-            Roles = roles
-        };
+        ApplicationUser user, List<string> roles,
+        string? createdByName, string? updatedByName) => new()
+    {
+        Id = user.Id,
+        Email = user.Email!,
+        UserName = user.UserName!,
+        FirstName = user.FirstName,
+        LastName = user.LastName,
+        ProfileImagePath = user.ProfileImagePath,
+        ProfileThumbPath = user.ProfileThumbPath,
+        TenantId = user.TenantId,
+        BranchId = user.BranchId,
+        IsSuperAdmin = user.IsSuperAdmin,
+        IsActive = user.IsActive,
+        IsDeleted = user.IsDeleted,
+        IsTemporaryPassword = user.IsTemporaryPassword,
+        LastLoginAt = user.LastLoginAt,
+        CreatedAt = user.CreatedAt,
+        CreatedBy = createdByName,
+        UpdatedAt = user.UpdatedAt,
+        UpdatedBy = updatedByName,
+        Roles = roles
+    };
 }

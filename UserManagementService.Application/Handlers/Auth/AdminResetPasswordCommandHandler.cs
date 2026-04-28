@@ -16,20 +16,16 @@ public class AdminResetPasswordCommandHandler
     private readonly ILogPublisher _logPublisher;
     private readonly IPasswordGenerator _passwordGenerator;
 
-    private readonly IUserDisplayNameResolver _resolver;
-
     public AdminResetPasswordCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
         ILogPublisher logPublisher,
-        IPasswordGenerator passwordGenerator,
-        IUserDisplayNameResolver resolver)
+        IPasswordGenerator passwordGenerator)
     {
         _userManager = userManager;
         _emailService = emailService;
         _logPublisher = logPublisher;
         _passwordGenerator = passwordGenerator;
-        _resolver = resolver;
     }
 
     public async Task<bool> Handle(
@@ -39,8 +35,6 @@ public class AdminResetPasswordCommandHandler
         var user = await _userManager.FindByIdAsync(request.UserId);
         if (user == null || user.IsDeleted)
             throw new NotFoundException("User", request.UserId);
-
-        var resetByName = await _resolver.ResolveAsync(request.ResetByUserId, cancellationToken);
 
         var tempPassword = request.NewPassword ?? _passwordGenerator.GenerateTempPassword();
 
@@ -57,7 +51,7 @@ public class AdminResetPasswordCommandHandler
         user.LastPasswordChangedAt = DateTime.UtcNow;
         user.PasswordChangedCount += 1;
         user.UpdatedAt = DateTime.UtcNow;
-        user.UpdatedBy = resetByName;
+        user.UpdatedBy = request.ResetByUserId;
         await _userManager.UpdateAsync(user);
 
         var displayName = user.FirstName ?? user.UserName ?? "User";

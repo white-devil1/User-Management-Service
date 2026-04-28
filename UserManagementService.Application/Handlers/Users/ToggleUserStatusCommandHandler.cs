@@ -15,18 +15,14 @@ public class ToggleUserStatusCommandHandler
     private readonly IEventPublisher _eventPublisher;
     private readonly ILogPublisher _logPublisher;
 
-    private readonly IUserDisplayNameResolver _resolver;
-
     public ToggleUserStatusCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEventPublisher eventPublisher,
-        ILogPublisher logPublisher,
-        IUserDisplayNameResolver resolver)
+        ILogPublisher logPublisher)
     {
         _userManager = userManager;
         _eventPublisher = eventPublisher;
         _logPublisher = logPublisher;
-        _resolver = resolver;
     }
 
     public async Task<bool> Handle(
@@ -41,7 +37,7 @@ try
         
                 user.IsActive = request.IsActive;
                 user.UpdatedAt = DateTime.UtcNow;
-                user.UpdatedBy = await _resolver.ResolveAsync(request.UpdatedBy, cancellationToken);
+                user.UpdatedBy = request.UpdatedBy;
         
                 var result = await _userManager.UpdateAsync(user);
                 if (!result.Succeeded)

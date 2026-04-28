@@ -6,6 +6,7 @@ using UserManagementService.Application.Events;
 using UserManagementService.Application.Services;
 using UserManagementService.Domain.Entities.Identity;
 
+
 namespace UserManagementService.Application.Handlers.Users;
 
 public class DeleteUserCommandHandler
@@ -15,18 +16,14 @@ public class DeleteUserCommandHandler
     private readonly IEventPublisher _eventPublisher;
     private readonly ILogPublisher _logPublisher;
 
-    private readonly IUserDisplayNameResolver _resolver;
-
     public DeleteUserCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEventPublisher eventPublisher,
-        ILogPublisher logPublisher,
-        IUserDisplayNameResolver resolver)
+        ILogPublisher logPublisher)
     {
         _userManager = userManager;
         _eventPublisher = eventPublisher;
         _logPublisher = logPublisher;
-        _resolver = resolver;
     }
 
     public async Task<bool> Handle(
@@ -64,13 +61,12 @@ public class DeleteUserCommandHandler
                 throw new ValidationException("User is already deleted.");
             }
 
-            var deletedByName = await _resolver.ResolveAsync(request.DeletedBy, cancellationToken);
             user.IsDeleted = true;
             user.DeletedAt = DateTime.UtcNow;
-            user.DeletedBy = deletedByName;
+            user.DeletedBy = request.DeletedBy;
             user.IsActive = false;
             user.UpdatedAt = DateTime.UtcNow;
-            user.UpdatedBy = deletedByName;
+            user.UpdatedBy = request.DeletedBy;
 
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)

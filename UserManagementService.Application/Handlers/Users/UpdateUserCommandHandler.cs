@@ -89,7 +89,7 @@ public class UpdateUserCommandHandler
             if (request.IsActive.HasValue) user.IsActive = request.IsActive.Value;
             if (request.BranchId.HasValue) user.BranchId = request.BranchId.Value;
             user.UpdatedAt = DateTime.UtcNow;
-            user.UpdatedBy = await _resolver.ResolveAsync(request.UpdatedBy, cancellationToken);
+            user.UpdatedBy = request.UpdatedBy;
 
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)
@@ -210,7 +210,9 @@ public class UpdateUserCommandHandler
                 IsSuccess = true
             });
 
-            return MapToUserResponse(user, roles.ToList());
+            var createdByName = await _resolver.ResolveAsync(user.CreatedBy, cancellationToken);
+            var updatedByName = await _resolver.ResolveAsync(user.UpdatedBy, cancellationToken);
+            return MapToUserResponse(user, roles.ToList(), createdByName, updatedByName);
         }
         catch (NotFoundException)
         {
@@ -237,7 +239,8 @@ public class UpdateUserCommandHandler
     }
 
     private static UserResponse MapToUserResponse(
-        ApplicationUser user, List<string> roles) => new()
+        ApplicationUser user, List<string> roles,
+        string? createdByName = null, string? updatedByName = null) => new()
         {
             Id = user.Id,
             Email = user.Email!,
@@ -254,9 +257,9 @@ public class UpdateUserCommandHandler
             IsTemporaryPassword = user.IsTemporaryPassword,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt,
-            CreatedBy = user.CreatedBy,
+            CreatedBy = createdByName,
             UpdatedAt = user.UpdatedAt,
-            UpdatedBy = user.UpdatedBy,
+            UpdatedBy = updatedByName,
             Roles = roles
         };
 }

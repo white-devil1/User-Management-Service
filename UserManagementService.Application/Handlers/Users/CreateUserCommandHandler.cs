@@ -74,7 +74,6 @@ public class CreateUserCommandHandler
                 resolvedRoleNames.Add(role.Name!);
             }
 
-            var createdByName = await _resolver.ResolveAsync(request.CreatedBy, cancellationToken);
             var tempPassword = _passwordGenerator.GenerateTempPassword();
 
             var user = new ApplicationUser
@@ -91,9 +90,9 @@ public class CreateUserCommandHandler
                 MustChangePassword = true,
                 TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(24),
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = createdByName,
+                CreatedBy = request.CreatedBy,
                 UpdatedAt = DateTime.UtcNow,
-                UpdatedBy = createdByName
+                UpdatedBy = request.CreatedBy
             };
 
             var result = await _userManager.CreateAsync(user, tempPassword);
@@ -197,7 +196,9 @@ public class CreateUserCommandHandler
                 IsSuccess = true
             });
 
-            return MapToUserResponse(user, resolvedRoleNames);
+            var createdByName = await _resolver.ResolveAsync(user.CreatedBy, cancellationToken);
+            var updatedByName = await _resolver.ResolveAsync(user.UpdatedBy, cancellationToken);
+            return MapToUserResponse(user, resolvedRoleNames, createdByName, updatedByName);
         }
         catch (ConflictException)
         {
@@ -227,7 +228,8 @@ public class CreateUserCommandHandler
     }
 
     private static UserResponse MapToUserResponse(
-        ApplicationUser user, List<string> roles) => new()
+        ApplicationUser user, List<string> roles,
+        string? createdByName = null, string? updatedByName = null) => new()
         {
             Id = user.Id,
             Email = user.Email!,
@@ -244,9 +246,9 @@ public class CreateUserCommandHandler
             IsTemporaryPassword = user.IsTemporaryPassword,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt,
-            CreatedBy = user.CreatedBy,
+            CreatedBy = createdByName,
             UpdatedAt = user.UpdatedAt,
-            UpdatedBy = user.UpdatedBy,
+            UpdatedBy = updatedByName,
             Roles = roles
         };
 }
