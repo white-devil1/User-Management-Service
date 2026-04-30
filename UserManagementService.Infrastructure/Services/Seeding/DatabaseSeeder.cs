@@ -333,13 +333,13 @@ public static class DatabaseSeeder
                     DeletedBy = null
                 };
 
-                var result = await userManager.CreateAsync(superAdminUser, "NewPass@123456");
+                var result = await userManager.CreateAsync(superAdminUser, "Admin@123");
 
                 if (result.Succeeded)
                 {
                     await userManager.AddToRoleAsync(superAdminUser, "Super Admin");
                     Console.WriteLine($"✅ Super Admin user created: {superAdminEmail}");
-                    Console.WriteLine($"   Password: NewPass@123456");
+                    Console.WriteLine($"   Password: Admin@123");
                     Console.WriteLine($"   UserId: {SuperAdminUserId}");
                 }
                 else
@@ -380,7 +380,7 @@ public static class DatabaseSeeder
             Console.WriteLine("");
             Console.WriteLine("🔑 Login Credentials:");
             Console.WriteLine($"   Email: {superAdminEmail}");
-            Console.WriteLine($"   Password: NewPass@123456");
+            Console.WriteLine($"   Password: Admin@123");
             Console.WriteLine("");
         }
         catch (Exception ex)
