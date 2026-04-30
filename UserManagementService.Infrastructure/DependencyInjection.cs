@@ -22,6 +22,7 @@ using UserManagementService.Infrastructure.Services.Logging;
 using UserManagementService.Infrastructure.Services.Pages;
 using UserManagementService.Infrastructure.Services.FileStorage;
 using UserManagementService.Infrastructure.Services.Roles;
+using UserManagementService.Infrastructure.Services.Subscriptions;
 using UserManagementService.Infrastructure.Services.Token;
 using UserManagementService.Infrastructure.Services.Identity;
 using UserManagementService.Infrastructure.Services.User;
@@ -206,6 +207,9 @@ public static class DependencyInjection
 
         // Role Services
         services.AddScoped<IRoleService, RoleService>();
+
+        // Subscription Services
+        services.AddScoped<ISubscriptionService, SubscriptionService>();
 
         // File Storage Service
         services.AddScoped<IFileStorageService, FileStorageService>();

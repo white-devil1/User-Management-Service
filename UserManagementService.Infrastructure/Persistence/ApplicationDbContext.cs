@@ -6,6 +6,7 @@ using UserManagementService.Domain.Common;
 using UserManagementService.Domain.Entities.Auth;
 using UserManagementService.Domain.Entities.Identity;
 using UserManagementService.Domain.Entities.RBAC;
+using UserManagementService.Domain.Entities.Subscriptions;
 
 namespace UserManagementService.Infrastructure.Persistence;
 
@@ -25,6 +26,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<OtpVerification> OtpVerifications => Set<OtpVerification>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<SubscriptionApp> SubscriptionApps => Set<SubscriptionApp>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
