@@ -16,17 +16,20 @@ public class RefreshTokenService : IRefreshTokenService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenStorageService _refreshTokenStorage;
+    private readonly IAppPermissionResolverService _permissionResolver;
 
     public RefreshTokenService(
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
-        IRefreshTokenStorageService refreshTokenStorage)
+        IRefreshTokenStorageService refreshTokenStorage,
+        IAppPermissionResolverService permissionResolver)
     {
         _context = context;
         _userManager = userManager;
         _tokenService = tokenService;
         _refreshTokenStorage = refreshTokenStorage;
+        _permissionResolver = permissionResolver;
     }
 
     public async Task<LoginResponse> RefreshTokenAsync(string refreshToken)
@@ -54,13 +57,7 @@ public class RefreshTokenService : IRefreshTokenService
 
         var roles = await _userManager.GetRolesAsync(user);
 
-        var permissions = await _context.RolePermissions
-            .Include(rp => rp.Permission)
-            .Where(rp => roles.Contains(rp.Role.Name!))
-            .Where(rp => rp.Permission.IsEnabled)
-            .Select(rp => rp.Permission.PermissionCode)
-            .Distinct()
-            .ToListAsync();
+        var access = await _permissionResolver.GetUserAccessAsync(user, roles);
 
         var newAccessToken = _tokenService.GenerateAccessToken(user, roles, new List<string>());
         var newRefreshTokenValue = _tokenService.GenerateRefreshToken();
@@ -79,26 +76,24 @@ public class RefreshTokenService : IRefreshTokenService
         _context.RefreshTokens.Add(newRefreshToken);
         await _context.SaveChangesAsync();
 
-        // Generate permissions token
-        var permissionsToken = _tokenService.GeneratePermissionsToken(user.Id, permissions);
+        var permissionsToken = _tokenService.GeneratePermissionsToken(user.Id, access);
 
-        // ... then in the return:
         return new LoginResponse
         {
             UserId = user.Id,
             Email = user.Email!,
             AccessToken = newAccessToken,
-            PermissionsToken = permissionsToken,   // ADD THIS
+            PermissionsToken = permissionsToken,
             RefreshToken = newRefreshTokenValue,
             AccessTokenExpires = accessTokenExpires,
             RefreshTokenExpires = refreshTokenExpires,
-            PermissionsTokenExpires = accessTokenExpires,  // ADD THIS
+            PermissionsTokenExpires = accessTokenExpires,
             TenantId = user.TenantId,
             BranchId = user.BranchId,
             IsSuperAdmin = user.IsSuperAdmin,
             RequiresPasswordChange = user.IsTemporaryPassword && user.MustChangePassword,
-            Roles = roles.ToList()
-            // Permissions property removed — use PermissionsToken instead
+            Roles = roles.ToList(),
+            Apps = access.Apps
         };
 
     }

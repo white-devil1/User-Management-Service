@@ -2,9 +2,11 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using UserManagementService.Application.DTOs.Auth;
 using UserManagementService.Application.Services;
 using UserManagementService.Domain.Entities.Identity;
 
@@ -63,8 +65,8 @@ public class TokenService : ITokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-     // ✅ NEW: Permissions JWT (larger, contains all permissions)
-    public string GeneratePermissionsToken(string userId, IList<string> permissions)
+    // Permissions JWT — carries the full access surface (permissions + apps + pages).
+    public string GeneratePermissionsToken(string userId, UserAccessDto access)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
@@ -79,11 +81,22 @@ public class TokenService : ITokenService
             new("UserId", userId)
         };
 
-        // Add ALL permissions as claims
-        foreach (var permission in permissions)
+        foreach (var permission in access.Permissions)
         {
             claims.Add(new Claim("permission", permission));
         }
+
+        // Apps tree (apps -> pages -> permissions) serialized as JSON so the
+        // frontend can rebuild navigation without an extra round-trip. JWT
+        // claims are flat strings, so one JSON payload beats one claim per node.
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        claims.Add(new Claim(
+            "apps",
+            JsonSerializer.Serialize(access.Apps, jsonOptions),
+            JsonClaimValueTypes.JsonArray));
 
         // Same expiration as access token
         var expirationMinutes = jwtSettings["AccessTokenExpirationMinutes"] ?? "15";

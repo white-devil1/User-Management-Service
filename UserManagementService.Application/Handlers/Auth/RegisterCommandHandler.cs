@@ -71,13 +71,13 @@ public class RegisterCommandHandler
         await _userManager.AddToRoleAsync(user, roleName);
 
         var roles = await _userManager.GetRolesAsync(user);
-        var permissions = await _permissionResolver
-            .GetUserPermissionsAsync(user, roles, cancellationToken);
+        var access = await _permissionResolver
+            .GetUserAccessAsync(user, roles, cancellationToken);
 
         var accessToken = _tokenService.GenerateAccessToken(
             user, roles, new List<string>());
         var permissionsToken = _tokenService.GeneratePermissionsToken(
-            user.Id, permissions);
+            user.Id, access);
         var refreshToken = _tokenService.GenerateRefreshToken();
         var accessExpires = _tokenService.GetAccessTokenExpiration();
         var refreshExpires = _tokenService.GetRefreshTokenExpiration();
@@ -114,7 +114,8 @@ public class RegisterCommandHandler
             BranchId = user.BranchId,
             IsSuperAdmin = user.IsSuperAdmin,
             RequiresPasswordChange = false,
-            Roles = roles.ToList()
+            Roles = roles.ToList(),
+            Apps = access.Apps
         };
     }
 }
