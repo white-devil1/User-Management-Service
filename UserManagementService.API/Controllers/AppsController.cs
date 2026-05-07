@@ -10,7 +10,8 @@ namespace UserManagementService.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "SuperAdminOnly")]
+// [Authorize(Policy = "SuperAdminOnly")]
+[Authorize]
 public class AppsController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -62,6 +63,7 @@ public class AppsController : ControllerBase
             Name = request.Name,
             Description = request.Description,
             Icon = request.Icon,
+            RouteUrl = request.RouteUrl,
             DisplayOrder = request.DisplayOrder,
             CreatedBy = GetUserId()
         };
@@ -80,6 +82,7 @@ public class AppsController : ControllerBase
             Name = request.Name,
             Description = request.Description,
             Icon = request.Icon,
+            RouteUrl = request.RouteUrl,
             DisplayOrder = request.DisplayOrder,
             IsActive = request.IsActive,
             UpdatedBy = GetUserId()

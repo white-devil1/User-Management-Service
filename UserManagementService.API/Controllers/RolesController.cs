@@ -66,7 +66,8 @@ public class RolesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<RoleResponse>>> CreateRole(
         [FromBody] CreateRoleRequest request)
     {
@@ -85,7 +86,8 @@ public class RolesController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<RoleResponse>>> UpdateRole(
         string id, [FromBody] UpdateRoleRequest request)
     {
@@ -104,7 +106,8 @@ public class RolesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteRole(string id)
     {
         var command = new DeleteRoleCommand
@@ -133,7 +136,8 @@ public class RolesController : ControllerBase
     }
 
     [HttpPost("{id}/permissions")]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<RoleResponse>>> AssignPermissions(
         string id, [FromBody] AssignPermissionsRequest request)
     {

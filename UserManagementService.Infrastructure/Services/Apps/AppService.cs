@@ -110,6 +110,7 @@ public class AppService : IAppService
             Code = code,
             Description = request.Description,
             Icon = request.Icon,
+            RouteUrl = request.RouteUrl,
             DisplayOrder = request.DisplayOrder,
             IsActive = true,
             CreatedBy = createdBy,
@@ -142,6 +143,7 @@ public class AppService : IAppService
         app.Name = request.Name;
         app.Description = request.Description;
         app.Icon = request.Icon;
+        app.RouteUrl = request.RouteUrl;
         app.DisplayOrder = request.DisplayOrder;
         app.IsActive = request.IsActive;
         app.UpdatedBy = updatedBy;
@@ -204,6 +206,7 @@ public class AppService : IAppService
         Code = app.Code,
         Description = app.Description,
         Icon = app.Icon,
+        RouteUrl = app.RouteUrl,
         DisplayOrder = app.DisplayOrder,
         IsActive = app.IsActive,
         CreatedAt = app.CreatedAt,

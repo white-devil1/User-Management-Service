@@ -27,6 +27,7 @@ public class CreateAppCommandHandler
                     Name = request.Name,
                     Description = request.Description,
                     Icon = request.Icon,
+                    RouteUrl = request.RouteUrl,
                     DisplayOrder = request.DisplayOrder
                 },
                 request.CreatedBy, cancellationToken);

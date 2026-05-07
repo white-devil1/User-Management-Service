@@ -26,24 +26,25 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(UserManagementService.Application.Commands.Auth.LoginCommand).Assembly));
 
 // ✅ Authorization Policies Configuration
-builder.Services.AddAuthorization(options =>
-{
-    // Super Admin Only - requires IsSuperAdmin claim = "True"
-    options.AddPolicy("SuperAdminOnly", policy =>
-        policy.RequireClaim("IsSuperAdmin", "True"));
+// builder.Services.AddAuthorization(options =>
+// {
+//     // Super Admin Only - requires IsSuperAdmin claim = "True"
+//     options.AddPolicy("SuperAdminOnly", policy =>
+//         policy.RequireClaim("IsSuperAdmin", "True"));
 
-    // Super Admin OR any user who has the user-management permission
-    // This allows Tenant Admins who were granted user management access
-    options.AddPolicy("SuperAdminOrTenantAdmin", policy =>
-        policy.RequireAssertion(ctx =>
-            ctx.User.HasClaim("IsSuperAdmin", "True") ||
-            ctx.User.HasClaim("Permission", "USERMAN_USERS_CREATE") ||
-            ctx.User.HasClaim("Permission", "USERMAN_USERS_UPDATE") ||
-            ctx.User.IsInRole("Tenant Admin") ||
-            ctx.User.IsInRole("Super Admin")
-        ));
+//     // Super Admin OR any user who has the user-management permission
+//     // This allows Tenant Admins who were granted user management access
+//     options.AddPolicy("SuperAdminOrTenantAdmin", policy =>
+//         policy.RequireAssertion(ctx =>
+//             ctx.User.HasClaim("IsSuperAdmin", "True") ||
+//             ctx.User.HasClaim("Permission", "USERMAN_USERS_CREATE") ||
+//             ctx.User.HasClaim("Permission", "USERMAN_USERS_UPDATE") ||
+//             ctx.User.IsInRole("Tenant Admin") ||
+//             ctx.User.IsInRole("Super Admin")
+//         ));
 
-});
+// });
+builder.Services.AddAuthorization();
 
 // Add controllers
 builder.Services.AddControllers();

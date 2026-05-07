@@ -9,7 +9,8 @@ public class AppDto
     public string? Icon { get; set; }
     public int DisplayOrder { get; set; }
     public bool IsActive { get; set; }
-
+    public string? RouteUrl { get; set; } 
+    
     // ✅ Audit Fields
     public DateTime CreatedAt { get; set; }
     public string? CreatedBy { get; set; }

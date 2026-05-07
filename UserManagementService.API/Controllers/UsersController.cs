@@ -82,7 +82,8 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<UserResponse>>> CreateUser(
         [FromForm] CreateUserRequest request,
@@ -134,7 +135,8 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<UserResponse>>> UpdateUser(
         string id,
@@ -184,7 +186,8 @@ public class UsersController : ControllerBase
     }
 
     [HttpPatch("{id}/status")]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> ToggleUserStatus(
         string id, [FromBody] ToggleUserStatusRequest request)
     {
@@ -196,7 +199,8 @@ public class UsersController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(string id)
     {
         var command = new DeleteUserCommand
@@ -207,7 +211,8 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id}/restore")]
-    [Authorize(Policy = "SuperAdminOnly")]
+    // [Authorize(Policy = "SuperAdminOnly")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> RestoreUser(string id)
     {
         var result = await _mediator.Send(
@@ -230,7 +235,8 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("{id}/reset-password")]
-    [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    // [Authorize(Policy = "SuperAdminOrTenantAdmin")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> ResetUserPassword(string id)
     {
         var command = new AdminResetPasswordCommand

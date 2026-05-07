@@ -10,7 +10,8 @@ namespace UserManagementService.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "SuperAdminOnly")]
+// [Authorize(Policy = "SuperAdminOnly")]
+[Authorize]
 public class AppPermissionsController : ControllerBase
 {
     private readonly IMediator _mediator;

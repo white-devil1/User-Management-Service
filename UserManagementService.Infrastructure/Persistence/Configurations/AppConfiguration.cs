@@ -27,7 +27,10 @@ public class AppConfiguration : IEntityTypeConfiguration<App>
             .HasMaxLength(500);
 
         builder.Property(e => e.Icon)
-            .HasMaxLength(200);
+            .HasMaxLength(4000);
+
+        builder.Property(e => e.RouteUrl)
+            .HasMaxLength(500);
 
         builder.Property(e => e.DisplayOrder)
             .IsRequired();

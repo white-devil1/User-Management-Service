@@ -28,6 +28,7 @@ public class UpdateAppCommandHandler
                     Name = request.Name,
                     Description = request.Description,
                     Icon = request.Icon,
+                    RouteUrl = request.RouteUrl,
                     DisplayOrder = request.DisplayOrder,
                     IsActive = request.IsActive
                 },

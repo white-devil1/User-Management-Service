@@ -11,8 +11,11 @@ public class UpdateAppRequest
     [StringLength(500)]
     public string? Description { get; set; }
 
-    [StringLength(200)]
+    [StringLength(4000)]
     public string? Icon { get; set; }
+
+    [StringLength(500)]
+    public string? RouteUrl { get; set; }
 
     [Range(1, 999)]
     public int DisplayOrder { get; set; }

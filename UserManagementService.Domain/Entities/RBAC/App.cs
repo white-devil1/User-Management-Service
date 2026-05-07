@@ -10,7 +10,7 @@ public class App : BaseEntity
     public string? Icon { get; set; }
     public int DisplayOrder { get; set; } = 0;
     public bool IsActive { get; set; } = true;
-
+    public string? RouteUrl { get; set; } 
 
     // Navigation Properties
     public virtual ICollection<Page> Pages { get; set; } = new List<Page>();
