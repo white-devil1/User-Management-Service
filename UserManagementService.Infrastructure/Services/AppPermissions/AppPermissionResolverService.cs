@@ -74,6 +74,7 @@ public class AppPermissionResolverService : IAppPermissionResolverService
                 p.PermissionCode,
                 p.AppId,
                 AppName = p.App!.Name,
+                AppCode = p.App!.Code,
                 AppDisplayOrder = p.App!.DisplayOrder,
                 p.PageId,
                 PageName = p.Page!.Name,
@@ -89,32 +90,14 @@ public class AppPermissionResolverService : IAppPermissionResolverService
             .ToList();
 
         var apps = permissionRows
-            .GroupBy(r => new { r.AppId, r.AppName, r.AppDisplayOrder })
+            .GroupBy(r => new { r.AppId, r.AppName, r.AppCode, r.AppDisplayOrder })
             .OrderBy(g => g.Key.AppDisplayOrder)
             .ThenBy(g => g.Key.AppName)
-            .Select(appGroup => new GroupedAppDto
+            .Select(g => new UserAppDto
             {
-                AppId = appGroup.Key.AppId,
-                AppName = appGroup.Key.AppName,
-                Pages = appGroup
-                    .GroupBy(r => new { r.PageId, r.PageName, r.PageDisplayOrder })
-                    .OrderBy(pg => pg.Key.PageDisplayOrder)
-                    .ThenBy(pg => pg.Key.PageName)
-                    .Select(pageGroup => new GroupedPageDto
-                    {
-                        PageId = pageGroup.Key.PageId,
-                        PageName = pageGroup.Key.PageName,
-                        Permissions = pageGroup
-                            .OrderBy(r => r.ActionName)
-                            .Select(r => new GroupedPermissionDto
-                            {
-                                Id = r.PermissionId,
-                                ActionName = r.ActionName,
-                                IsEnabled = true
-                            })
-                            .ToList()
-                    })
-                    .ToList()
+                AppId = g.Key.AppId,
+                AppName = g.Key.AppName,
+                Code = g.Key.AppCode
             })
             .ToList();
 

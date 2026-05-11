@@ -92,8 +92,7 @@ public class RefreshTokenService : IRefreshTokenService
             BranchId = user.BranchId,
             IsSuperAdmin = user.IsSuperAdmin,
             RequiresPasswordChange = user.IsTemporaryPassword && user.MustChangePassword,
-            Roles = roles.ToList(),
-            Apps = access.Apps
+            Roles = roles.ToList()
         };
 
     }

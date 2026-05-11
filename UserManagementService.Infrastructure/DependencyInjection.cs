@@ -57,7 +57,8 @@ public static class DependencyInjection
         })
         .AddRoles<ApplicationRole>()
         .AddEntityFrameworkStores<ApplicationDbContext>()
-        .AddDefaultTokenProviders();
+        .AddDefaultTokenProviders()
+        .AddRoleValidator<SoftDeleteAwareRoleValidator>();
 
         services.AddAuthentication(options =>
         {

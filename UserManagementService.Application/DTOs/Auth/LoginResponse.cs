@@ -1,6 +1,4 @@
-﻿using UserManagementService.Application.DTOs.AppPermissions;
-
-namespace UserManagementService.Application.DTOs.Auth;
+﻿namespace UserManagementService.Application.DTOs.Auth;
 
 public class LoginResponse
 {
@@ -25,10 +23,4 @@ public class LoginResponse
     public bool RequiresPasswordChange { get; set; }
 
     public List<string> Roles { get; set; } = new();
-
-    // Apps -> Pages -> Permissions tree (same shape as the role permissions
-    // list endpoint). Empty for SuperAdmin — IsSuperAdmin grants full access.
-    public List<GroupedAppDto> Apps { get; set; } = new();
-    // NOTE: Permission codes are NOT in this response — decode PermissionsToken
-    // on the frontend. SuperAdmin users skip permission checks via IsSuperAdmin.
 }

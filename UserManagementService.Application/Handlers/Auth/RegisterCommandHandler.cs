@@ -114,8 +114,7 @@ public class RegisterCommandHandler
             BranchId = user.BranchId,
             IsSuperAdmin = user.IsSuperAdmin,
             RequiresPasswordChange = false,
-            Roles = roles.ToList(),
-            Apps = access.Apps
+            Roles = roles.ToList()
         };
     }
 }

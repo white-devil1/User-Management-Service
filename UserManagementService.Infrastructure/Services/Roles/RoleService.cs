@@ -205,30 +205,54 @@ public class RoleService : IRoleService
         if (validPerms.Count != permissionIds.Count)
             throw new ValidationException("One or more permissions are invalid or not enabled.");
 
-        var existing = await _context.RolePermissions
-            .Where(rp => rp.RoleId == roleId && !rp.IsDeleted)
+        // Use IgnoreQueryFilters to see soft-deleted rows too, so we can reactivate
+        // them instead of inserting duplicates (which would violate the unique index).
+        var allExisting = await _context.RolePermissions
+            .IgnoreQueryFilters()
+            .Where(rp => rp.RoleId == roleId)
             .ToListAsync(ct);
-        foreach (var rp in existing)
+
+        // Soft-delete any active permissions that are NOT in the new list
+        foreach (var rp in allExisting.Where(rp => !rp.IsDeleted && !permissionIds.Contains(rp.PermissionId)))
         {
             rp.IsDeleted = true;
             rp.DeletedAt = DateTime.UtcNow;
             rp.DeletedBy = callerUserId;
+            rp.UpdatedAt = DateTime.UtcNow;
+            rp.UpdatedBy = callerUserId;
         }
 
-        var newAssignments = permissionIds.Select(pid => new RolePermission
+        // Reactivate existing (possibly soft-deleted) rows, or insert brand-new ones
+        foreach (var pid in permissionIds)
         {
-            Id = Guid.NewGuid(),
-            RoleId = roleId,
-            PermissionId = pid,
-            AssignedAt = DateTime.UtcNow,
-            AssignedBy = callerUserId,
-            CreatedBy = callerUserId,
-            UpdatedBy = callerUserId,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        }).ToList();
+            var rp = allExisting.FirstOrDefault(r => r.PermissionId == pid);
+            if (rp != null)
+            {
+                rp.IsDeleted = false;
+                rp.DeletedAt = null;
+                rp.DeletedBy = null;
+                rp.AssignedAt = DateTime.UtcNow;
+                rp.AssignedBy = callerUserId;
+                rp.UpdatedAt = DateTime.UtcNow;
+                rp.UpdatedBy = callerUserId;
+            }
+            else
+            {
+                _context.RolePermissions.Add(new RolePermission
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = roleId,
+                    PermissionId = pid,
+                    AssignedAt = DateTime.UtcNow,
+                    AssignedBy = callerUserId,
+                    CreatedBy = callerUserId,
+                    UpdatedBy = callerUserId,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
 
-        await _context.RolePermissions.AddRangeAsync(newAssignments, ct);
         await _context.SaveChangesAsync(ct);
 
         var permCodes = await GetRolePermissionsGrouped(roleId, ct);
