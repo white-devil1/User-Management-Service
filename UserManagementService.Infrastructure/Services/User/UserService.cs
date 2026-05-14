@@ -94,8 +94,12 @@ public class UserService : IUserService
         var userResponses = new List<UserResponse>();
         foreach (var user in users)
         {
-            var roles = await _userManager.GetRolesAsync(user);
-            userResponses.Add(MapToUserResponse(user, roles.ToList(), names));
+            var roles   = await _userManager.GetRolesAsync(user);
+            var roleIds = await _context.UserRoles
+                .Where(ur => ur.UserId == user.Id)
+                .Select(ur => ur.RoleId)
+                .ToListAsync(cancellationToken);
+            userResponses.Add(MapToUserResponse(user, roles.ToList(), roleIds, names));
         }
 
         return new UserListResponse
@@ -115,9 +119,13 @@ public class UserService : IUserService
 
         if (user == null) return null;
 
-        var names = await BuildNameCacheAsync(new[] { user.CreatedBy, user.UpdatedBy, user.DeletedBy }, cancellationToken);
-        var roles = await _userManager.GetRolesAsync(user);
-        return MapToUserResponse(user, roles.ToList(), names);
+        var names   = await BuildNameCacheAsync(new[] { user.CreatedBy, user.UpdatedBy, user.DeletedBy }, cancellationToken);
+        var roles   = await _userManager.GetRolesAsync(user);
+        var roleIds = await _context.UserRoles
+            .Where(ur => ur.UserId == user.Id)
+            .Select(ur => ur.RoleId)
+            .ToListAsync(cancellationToken);
+        return MapToUserResponse(user, roles.ToList(), roleIds, names);
     }
 
     public async Task<List<RoleDto>> GetAvailableRolesAsync(
@@ -155,7 +163,7 @@ public class UserService : IUserService
     }
 
     private static UserResponse MapToUserResponse(
-        ApplicationUser user, List<string> roles, Dictionary<string, string> names) => new()
+        ApplicationUser user, List<string> roles, List<string> roleIds, Dictionary<string, string> names) => new()
     {
         Id = user.Id,
         Email = user.Email!,
@@ -177,7 +185,8 @@ public class UserService : IUserService
         UpdatedBy = user.UpdatedBy != null && names.TryGetValue(user.UpdatedBy, out var ub) ? ub : null,
         DeletedAt = user.DeletedAt,
         DeletedBy = user.DeletedBy != null && names.TryGetValue(user.DeletedBy, out var db) ? db : null,
-        Roles = roles
+        Roles   = roles,
+        RoleIds = roleIds
     };
 
     private IQueryable<ApplicationUser> ApplySortingAscending(IQueryable<ApplicationUser> query, string sortBy)

@@ -210,9 +210,16 @@ public class UpdateUserCommandHandler
                 IsSuccess = true
             });
 
+            var roleIds = new List<string>();
+            foreach (var roleName in roles)
+            {
+                var role = await _roleManager.FindByNameAsync(roleName);
+                if (role != null) roleIds.Add(role.Id);
+            }
+
             var createdByName = await _resolver.ResolveAsync(user.CreatedBy, cancellationToken);
             var updatedByName = await _resolver.ResolveAsync(user.UpdatedBy, cancellationToken);
-            return MapToUserResponse(user, roles.ToList(), createdByName, updatedByName);
+            return MapToUserResponse(user, roles.ToList(), roleIds, createdByName, updatedByName);
         }
         catch (NotFoundException)
         {
@@ -239,7 +246,7 @@ public class UpdateUserCommandHandler
     }
 
     private static UserResponse MapToUserResponse(
-        ApplicationUser user, List<string> roles,
+        ApplicationUser user, List<string> roles, List<string> roleIds,
         string? createdByName = null, string? updatedByName = null) => new()
         {
             Id = user.Id,
@@ -260,6 +267,7 @@ public class UpdateUserCommandHandler
             CreatedBy = createdByName,
             UpdatedAt = user.UpdatedAt,
             UpdatedBy = updatedByName,
-            Roles = roles
+            Roles   = roles,
+            RoleIds = roleIds
         };
 }

@@ -44,4 +44,10 @@ public interface IAppPermissionService
         List<BulkToggleItem> permissionStatuses,
         string updatedBy,
         CancellationToken cancellationToken = default);
+
+    // Export Operation
+    Task<List<ExportPermissionRowDto>> GetPermissionsForExportAsync(
+        Guid? appId,
+        Guid? pageId,
+        CancellationToken cancellationToken = default);
 }

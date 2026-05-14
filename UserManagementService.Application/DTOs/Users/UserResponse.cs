@@ -23,5 +23,6 @@ public class UserResponse
     public string? UpdatedBy { get; set; }  // ← ADD THIS
     public DateTime? DeletedAt { get; set; }
     public string? DeletedBy { get; set; }
-    public List<string> Roles { get; set; } = new();
+    public List<string> Roles   { get; set; } = new();
+    public List<string> RoleIds { get; set; } = new();
 }

@@ -305,4 +305,38 @@ public class AppPermissionService : IAppPermissionService
         }
         return "Unknown Page";
     }
+
+    public async Task<List<ExportPermissionRowDto>> GetPermissionsForExportAsync(
+        Guid? appId,
+        Guid? pageId,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Permissions
+            .Include(p => p.Action).ThenInclude(a => a!.Page).ThenInclude(pg => pg!.App)
+            .Where(p => !p.IsDeleted)
+            .AsQueryable();
+
+        if (appId.HasValue)
+            query = query.Where(p => p.AppId == appId.Value);
+
+        if (pageId.HasValue)
+            query = query.Where(p => p.PageId == pageId.Value);
+
+        return await query
+            .OrderBy(p => p.Action!.Page!.App!.Name)
+            .ThenBy(p => p.Action!.Page!.Name)
+            .ThenBy(p => p.Action!.Name)
+            .Select(p => new ExportPermissionRowDto
+            {
+                AppName        = p.Action!.Page!.App!.Name,
+                AppCode        = p.Action.Page.App.Code,
+                PageName       = p.Action.Page.Name,
+                PageCode       = p.Action.Page.Code,
+                ActionName     = p.Action.Name,
+                ActionCode     = p.Action.Code,
+                PermissionName = p.Name,
+                PermissionCode = p.PermissionCode
+            })
+            .ToListAsync(cancellationToken);
+    }
 }
